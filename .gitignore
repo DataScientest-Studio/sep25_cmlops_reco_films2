@@ -62,6 +62,8 @@ target/
 # Database
 *.db
 *.rdb
+*.sqlite
+database/*.db
 
 # Pycharm
 .idea
@@ -78,6 +80,12 @@ target/
 # exclude data from source control by default
 /data/
 
+# Data files - Ne pas versionner les donnees volumineuses
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
 # Mac OS-specific storage files
 .DS_Store
 
@@ -87,3 +95,16 @@ target/
 
 # Mypy cache
 .mypy_cache/
+
+# Models
+models/*.pkl
+models/*.h5
+models/*.joblib
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
