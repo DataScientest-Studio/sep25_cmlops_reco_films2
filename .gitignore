@@ -59,6 +59,9 @@ target/
 # DotEnv configuration
 .env
 
+# Environment variables
+.env
+
 # Database
 *.db
 *.rdb
