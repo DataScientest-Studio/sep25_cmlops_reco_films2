@@ -1,11 +1,14 @@
 """
 Script de preprocessing pour creer les matrices movie_matrix et user_matrix
 """
-import sqlite3
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+from database.config import get_connection
+
+
 
 
 def create_movie_matrix(conn):
@@ -184,20 +187,15 @@ def main():
     
     # Chemins
     project_root = Path(__file__).parent.parent.parent
-    db_path = project_root / "database" / "recofilm.db"
     output_path = project_root / "data" / "processed"
     
-    # Verifier que la BDD existe
-    if not db_path.exists():
-        print("ERREUR: La base de donnees n'existe pas!")
-        print("Executez d'abord: python src/data/ingest_data.py")
-        return
-    
-    print(f"Base de donnees: {db_path}")
+    print(f"Base de donnees: PostgreSQL (Supabase)")
     print(f"Dossier de sortie: {output_path}")
     
     # Connexion
-    conn = sqlite3.connect(db_path)
+    print("\nConnexion a PostgreSQL...")
+    conn = get_connection()
+    print("Connexion etablie!")
     
     try:
         # Creer les matrices

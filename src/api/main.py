@@ -1,28 +1,31 @@
 """
 API FastAPI pour le systeme de recommandation de films
+Version PostgreSQL (Supabase)
 """
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import pandas as pd
 import pickle
-import sqlite3
 import subprocess
 from pathlib import Path
 import sys
+
+# Ajout pour PostgreSQL
+sys.path.append(str(Path(__file__).parent.parent.parent / "database"))
+from config import get_connection
 
 
 app = FastAPI(
     title="RecoFilm API",
     description="API de recommandation de films basee sur MovieLens 20M",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 
 # Chemins globaux
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 MODEL_DIR = PROJECT_ROOT / "models"
-DB_PATH = PROJECT_ROOT / "database" / "recofilm.db"
 USER_MATRIX_PATH = PROJECT_ROOT / "data" / "processed" / "user_matrix.csv"
 MOVIE_MATRIX_PATH = PROJECT_ROOT / "data" / "processed" / "movie_matrix.csv"
 
@@ -67,7 +70,7 @@ def read_root():
     """
     return {
         "message": "Bienvenue sur l'API RecoFilm",
-        "version": "1.0.0",
+        "version": "2.0.0 (PostgreSQL)",
         "endpoints": {
             "/docs": "Documentation interactive Swagger",
             "/health": "Verifier l'etat de l'API",
@@ -86,7 +89,10 @@ def health_check():
     model_exists = (MODEL_DIR / "model.pkl").exists()
     
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.close()
         conn.close()
         db_ok = True
     except:
@@ -173,6 +179,12 @@ def predict(request: PredictionRequest):
             movie_ids = pickle.load(f)
         
         # Charger user_matrix
+        if not USER_MATRIX_PATH.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="user_matrix.csv non trouve. Executez preprocess.py d'abord."
+            )
+        
         user_matrix = pd.read_csv(USER_MATRIX_PATH)
         user_data = user_matrix[user_matrix['userId'] == user_id]
         
@@ -185,11 +197,17 @@ def predict(request: PredictionRequest):
         # Extraire le profil utilisateur
         user_profile = user_data.drop('userId', axis=1).values[0]
         
-        # Recuperer les films deja vus
-        conn = sqlite3.connect(DB_PATH)
-        query = f"SELECT DISTINCT movieId FROM ratings WHERE userId = {user_id}"
-        watched = pd.read_sql_query(query, conn)
-        watched_movies = set(watched['movieId'].values)
+        # Connexion PostgreSQL
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # Recuperer les films deja vus (requête paramétrée)
+        cursor.execute(
+            "SELECT DISTINCT movieId FROM ratings WHERE userId = %s",
+            (user_id,)
+        )
+        watched_results = cursor.fetchall()
+        watched_movies = set(row[0] for row in watched_results)
         
         # Trouver les films similaires
         distances, indices = model.kneighbors([user_profile])
@@ -202,24 +220,36 @@ def predict(request: PredictionRequest):
         ][:num_recommendations]
         
         # Recuperer les infos des films
+        if not MOVIE_MATRIX_PATH.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="movie_matrix.csv non trouve."
+            )
+        
         movie_matrix = pd.read_csv(MOVIE_MATRIX_PATH)
         recommendations = []
         
         for movie_id in filtered_recommendations:
-            query = f"SELECT title, genres FROM movies WHERE movieId = {movie_id}"
-            movie_info = pd.read_sql_query(query, conn)
+            # Requête paramétrée pour récupérer les infos du film
+            cursor.execute(
+                "SELECT title, genres FROM movies WHERE movieId = %s",
+                (int(movie_id),)
+            )
+            movie_result = cursor.fetchone()
             
-            if not movie_info.empty:
+            if movie_result:
+                title, genres = movie_result
                 movie_row = movie_matrix[movie_matrix['movieId'] == movie_id]
                 
                 recommendations.append({
                     "movieId": int(movie_id),
-                    "title": movie_info['title'].values[0],
-                    "genres": movie_info['genres'].values[0],
+                    "title": title,
+                    "genres": genres,
                     "avg_rating": float(movie_row['avg_rating'].values[0]) if not movie_row.empty else 0.0,
                     "num_ratings": int(movie_row['num_ratings'].values[0]) if not movie_row.empty else 0
                 })
         
+        cursor.close()
         conn.close()
         
         return {
@@ -231,6 +261,9 @@ def predict(request: PredictionRequest):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Erreur dans /predict: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
