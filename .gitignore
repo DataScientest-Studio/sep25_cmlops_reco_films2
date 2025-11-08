@@ -67,6 +67,9 @@ target/
 *.rdb
 *.sqlite
 database/*.db
+database/*.sqlite
+!database/config.py
+!database/init_db_postgres.py
 
 # Pycharm
 .idea
@@ -88,6 +91,7 @@ data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+
 
 # Mac OS-specific storage files
 .DS_Store
