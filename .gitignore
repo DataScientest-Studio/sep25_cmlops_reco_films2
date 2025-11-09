@@ -87,3 +87,8 @@ target/
 
 # Mypy cache
 .mypy_cache/
+
+# models
+models/*.pkl
+models/*.joblib
+models/*.h5
