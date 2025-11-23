@@ -1,22 +1,31 @@
 """
-Script d'entrainement du modele de recommandation (KNN)
+Script d'entrainement du modele de recommandation (KNN) avec MLflow + Model Registry (Aliases)
 """
 import pandas as pd
 import pickle
 from pathlib import Path
 from sklearn.neighbors import NearestNeighbors
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
+import time
+from datetime import datetime
 
 
-def train_model(movie_matrix_path):
+def train_model(movie_matrix_path, n_neighbors=20, algorithm='ball_tree', metric='euclidean'):
     """
     Entraine un modele KNN sur la movie_matrix
     
     Args:
         movie_matrix_path: Chemin vers movie_matrix.csv
+        n_neighbors: Nombre de voisins (K)
+        algorithm: Algorithme KNN ('ball_tree', 'kd_tree', 'brute', 'auto')
+        metric: Metrique de distance ('euclidean', 'manhattan', etc.)
     
     Returns:
         model: Modele KNN entraine
         movie_ids: Liste des movieIds correspondant aux indices du modele
+        metrics: Dictionnaire des metriques
     """
     print("\n1. Chargement de movie_matrix...")
     movie_matrix = pd.read_csv(movie_matrix_path)
@@ -28,16 +37,29 @@ def train_model(movie_matrix_path):
     features = movie_matrix.drop('movieId', axis=1)
     
     print(f"\n2. Entrainement du modele KNN...")
-    print(f"   Algorithme: ball_tree")
-    print(f"   Nombre de voisins: 20")
+    print(f"   Algorithme: {algorithm}")
+    print(f"   Nombre de voisins: {n_neighbors}")
+    print(f"   Metrique: {metric}")
+    
+    # Mesurer le temps d'entrainement
+    start_time = time.time()
     
     # Entrainer le modele KNN
-    model = NearestNeighbors(n_neighbors=20, algorithm='ball_tree')
+    model = NearestNeighbors(n_neighbors=n_neighbors, algorithm=algorithm, metric=metric)
     model.fit(features)
     
-    print(f"   Modele entraine avec succes!")
+    training_time = time.time() - start_time
     
-    return model, movie_ids
+    print(f"   Modele entraine en {training_time:.2f} secondes!")
+    
+    # Metriques
+    metrics = {
+        'training_time': training_time,
+        'n_samples': len(movie_matrix),
+        'n_features': features.shape[1]
+    }
+    
+    return model, movie_ids, metrics
 
 
 def save_model(model, movie_ids, output_dir):
@@ -59,8 +81,9 @@ def save_model(model, movie_ids, output_dir):
     with open(model_path, 'wb') as f:
         pickle.dump(model, f)
     
+    model_size = model_path.stat().st_size / 1024
     print(f"   Modele sauvegarde: {model_path}")
-    print(f"   Taille: {model_path.stat().st_size / 1024:.2f} KB")
+    print(f"   Taille: {model_size:.2f} KB")
     
     # Sauvegarder les movieIds (pour retrouver les films plus tard)
     ids_path = output_dir / "movie_ids.pkl"
@@ -68,6 +91,8 @@ def save_model(model, movie_ids, output_dir):
         pickle.dump(movie_ids, f)
     
     print(f"   MovieIds sauvegardes: {ids_path}")
+    
+    return model_size
 
 
 def test_model(model, movie_ids, movie_matrix_path):
@@ -78,6 +103,9 @@ def test_model(model, movie_ids, movie_matrix_path):
         model: Modele KNN entraine
         movie_ids: Liste des movieIds
         movie_matrix_path: Chemin vers movie_matrix.csv
+    
+    Returns:
+        test_distance: Distance moyenne des 5 plus proches voisins
     """
     print(f"\n4. Test du modele...")
     
@@ -92,6 +120,9 @@ def test_model(model, movie_ids, movie_matrix_path):
     features = movie_matrix.drop('movieId', axis=1)
     distances, indices = model.kneighbors([features.iloc[test_film_idx]])
     
+    # Calculer la distance moyenne (metrique de qualite)
+    avg_distance = distances[0][1:6].mean()
+    
     # Afficher les resultats
     print(f"\n   Film de test: movieId={test_film_id}")
     print(f"   Films similaires trouves:")
@@ -100,15 +131,115 @@ def test_model(model, movie_ids, movie_matrix_path):
         similar_movie_id = movie_ids[idx]
         print(f"     {i+1}. movieId={similar_movie_id} (distance={dist:.4f})")
     
-    print(f"\n   Le modele fonctionne correctement!")
+    print(f"\n   Distance moyenne: {avg_distance:.4f}")
+    print(f"   Le modele fonctionne correctement!")
+    
+    return avg_distance
+
+
+def register_model(model_name, run_id, avg_distance):
+    """
+    Enregistre le modele dans MLflow Model Registry
+    
+    Args:
+        model_name: Nom du modele dans le registry
+        run_id: ID du run MLflow
+        avg_distance: Metrique de qualite du modele
+    
+    Returns:
+        model_version: Version du modele enregistre
+    """
+    print(f"\n5. Enregistrement dans MLflow Model Registry...")
+    
+    client = MlflowClient()
+    
+    # Verifier si le modele existe deja dans le registry
+    try:
+        client.get_registered_model(model_name)
+        print(f"   Modele '{model_name}' existe deja dans le registry")
+    except:
+        # Creer le modele dans le registry
+        client.create_registered_model(
+            model_name,
+            description="Modele KNN pour recommandation de films (MovieLens 10M)"
+        )
+        print(f"   Nouveau modele '{model_name}' cree dans le registry")
+    
+    # Enregistrer cette version du modele
+    model_uri = f"runs:/{run_id}/model"
+    model_version = mlflow.register_model(model_uri, model_name)
+    
+    print(f"   Version enregistree: {model_version.version}")
+    
+    # Ajouter une description a cette version
+    client.update_model_version(
+        name=model_name,
+        version=model_version.version,
+        description=f"KNN model - avg_distance={avg_distance:.4f}"
+    )
+    
+    return model_version
+
+
+def compare_and_promote(model_name, current_version, avg_distance):
+    """
+    Compare avec le modele champion et promeut si meilleur (utilise les Aliases)
+    
+    Args:
+        model_name: Nom du modele dans le registry
+        current_version: Version actuelle du modele
+        avg_distance: Metrique du modele actuel
+    """
+    print(f"\n6. Comparaison avec le modele champion...")
+    
+    client = MlflowClient()
+    
+    # Chercher le modele actuellement "champion" (via alias)
+    try:
+        champion_version = client.get_model_version_by_alias(model_name, "champion")
+        
+        print(f"   Modele champion actuel: version {champion_version.version}")
+        
+        # Recuperer la metrique du champion
+        champion_run = client.get_run(champion_version.run_id)
+        champion_distance = champion_run.data.metrics.get('avg_test_distance', float('inf'))
+        
+        print(f"   Distance champion: {champion_distance:.4f}")
+        print(f"   Distance nouveau: {avg_distance:.4f}")
+        
+        # Plus la distance est faible, meilleur est le modele
+        if avg_distance < champion_distance:
+            print(f"   [OK] Nouveau modele MEILLEUR! Promotion en champion")
+            
+            # Retirer l'alias du champion actuel
+            client.delete_model_version_alias(model_name, "champion")
+            
+            # Donner l'alias champion au nouveau modele
+            client.set_registered_model_alias(model_name, "champion", current_version)
+            
+            print(f"   [OK] Version {current_version} promue champion!")
+            
+        else:
+            print(f"   [INFO] Nouveau modele moins bon que le champion")
+            print(f"   Version {current_version} reste sans alias")
+            
+    except Exception as e:
+        # Aucun champion actuel
+        print("   Aucun modele champion actuellement")
+        print(f"   Promotion de la version {current_version} en champion")
+        
+        # Donner l'alias champion
+        client.set_registered_model_alias(model_name, "champion", current_version)
+        
+        print("   [OK] Version promue champion!")
 
 
 def main():
     """
-    Fonction principale d'entrainement
+    Fonction principale d'entrainement avec MLflow + Model Registry (Aliases)
     """
     print("=" * 60)
-    print("ENTRAINEMENT DU MODELE DE RECOMMANDATION")
+    print("ENTRAINEMENT + MLFLOW MODEL REGISTRY (ALIASES)")
     print("=" * 60)
     
     # Chemins
@@ -116,27 +247,88 @@ def main():
     movie_matrix_path = project_root / "data" / "processed" / "movie_matrix.csv"
     output_dir = project_root / "models"
     
+    # Configuration MLflow
+    mlflow.set_tracking_uri("file:///C:/Users/Bender/Documents/formation_inge_IA/projet MLOPS/Code/sep25_cmlops_reco_films2/mlruns")
+    mlflow.set_experiment("recofilm-knn-recommender")
+    
+    # Nom du modele dans le registry
+    MODEL_NAME = "recofilm-knn-recommender"
+    
     # Verifier que movie_matrix existe
     if not movie_matrix_path.exists():
         print(f"\nERREUR: {movie_matrix_path} n'existe pas!")
         print("Executez d'abord: python src/data/preprocess.py")
         return
     
+    # Parametres du modele (tu peux les modifier pour tester)
+    params = {
+        'n_neighbors': 20,
+        'algorithm': 'ball_tree',
+        'metric': 'euclidean'
+    }
+    
     try:
-        # Entrainer le modele
-        model, movie_ids = train_model(movie_matrix_path)
+        # Demarrer un run MLflow
+        with mlflow.start_run(run_name=f"knn-training-{datetime.now().strftime('%Y%m%d-%H%M%S')}") as run:
+            
+            run_id = run.info.run_id
+            
+            # Logger les parametres
+            mlflow.log_params(params)
+            
+            print("\n[MLflow] Run demarre")
+            print(f"   Experiment: recofilm-knn-recommender")
+            print(f"   Run ID: {run_id}")
+            
+            # Entrainer le modele
+            model, movie_ids, metrics = train_model(
+                movie_matrix_path,
+                n_neighbors=params['n_neighbors'],
+                algorithm=params['algorithm'],
+                metric=params['metric']
+            )
+            
+            # Sauvegarder
+            model_size = save_model(model, movie_ids, output_dir)
+            
+            # Tester
+            avg_distance = test_model(model, movie_ids, movie_matrix_path)
+            
+            # Logger les metriques
+            mlflow.log_metric("training_time_seconds", metrics['training_time'])
+            mlflow.log_metric("n_samples", metrics['n_samples'])
+            mlflow.log_metric("n_features", metrics['n_features'])
+            mlflow.log_metric("model_size_kb", model_size)
+            mlflow.log_metric("avg_test_distance", avg_distance)
+            
+            # Logger le modele dans MLflow
+            mlflow.sklearn.log_model(model, "model")
+            
+            # Logger les artifacts (fichiers)
+            mlflow.log_artifact(str(output_dir / "model.pkl"))
+            mlflow.log_artifact(str(output_dir / "movie_ids.pkl"))
+            
+            print("\n[MLflow] Metriques loggees:")
+            print(f"   - Training time: {metrics['training_time']:.2f}s")
+            print(f"   - Samples: {metrics['n_samples']:,}")
+            print(f"   - Features: {metrics['n_features']}")
+            print(f"   - Model size: {model_size:.2f} KB")
+            print(f"   - Avg distance: {avg_distance:.4f}")
         
-        # Sauvegarder
-        save_model(model, movie_ids, output_dir)
+        # APRES la fin du run, enregistrer dans le Model Registry
+        model_version = register_model(MODEL_NAME, run_id, avg_distance)
         
-        # Tester
-        test_model(model, movie_ids, movie_matrix_path)
+        # Comparer et promouvoir si meilleur
+        compare_and_promote(MODEL_NAME, model_version.version, avg_distance)
         
         print("\n" + "=" * 60)
         print("ENTRAINEMENT TERMINE AVEC SUCCES")
         print("=" * 60)
-        print(f"\nLe modele est pret a etre utilise!")
-        print(f"Prochaine etape: python src/models/predict_model.py")
+        print(f"\n[OK] Modele enregistre: {MODEL_NAME} v{model_version.version}")
+        print(f"[INFO] Pour voir le Model Registry:")
+        print(f"   mlflow ui")
+        print(f"   Puis aller dans 'Models' -> Colonne 'Aliases'")
+        print(f"   Le modele champion aura l'alias 'champion'")
         
     except Exception as e:
         print(f"\nERREUR lors de l'entrainement: {e}")
