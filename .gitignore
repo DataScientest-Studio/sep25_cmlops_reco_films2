@@ -103,6 +103,10 @@ data/processed/*
 # Mypy cache
 .mypy_cache/
 
+# MLflow
+mlruns/
+mlartifacts/
+
 # Models
 models/*.pkl
 models/*.h5
