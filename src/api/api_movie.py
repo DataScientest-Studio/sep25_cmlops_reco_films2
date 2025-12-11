@@ -15,9 +15,10 @@ from dotenv import load_dotenv
 import os
 from datetime import date
 import psycopg2
-
-# Charger les variables d'environnement
-load_dotenv()
+import mlflow
+import mlflow.sklearn
+import logging
+from mlflow import MlflowClient
 
 # -----------------------------
 # CONFIG
@@ -28,14 +29,32 @@ MODEL_FILE = MODELS_DIR / "svd_model.pkl"
 RATING_SCALE = (0.5, 5.0)
 CHUNK_SIZE = 30
 
-# Configuration PostgreSQL
+
+# Charger les variables d'environnement
+load_dotenv(dotenv_path=BASE_DIR)
+
 DB_CONFIG = {
-    "host": os.getenv("PGHOST", "crossover.proxy.rlwy.net"),
-    "database": os.getenv("PGDATABASE", "railway"),
-    "user": os.getenv("PGUSER", "postgres"),
-    "password": os.getenv("PGPASSWORD", "GsoaNFyHnDBTGuebcvqIzEbuZTmSrtio"),
-    "port": os.getenv("PGPORT", "25783"),
+    "host": os.getenv("PGHOST"),
+    "database": os.getenv("PGDATABASE"),
+    "user": os.getenv("PGUSER"),
+    "password": os.getenv("PGPASSWORD"),
+    "port": os.getenv("PGPORT"),
 }
+
+mlflow.set_tracking_uri("sqlite:///mlflow.db")
+mlflow.set_experiment("reco_movie_api")
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # affiche dans la console
+        logging.FileHandler("training.log", mode="a")  # sauvegarde dans un fichier
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 # Créer le dossier models si nécessaire
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -84,28 +103,185 @@ def prepare_surprise_dataset(ratings):
     data = Dataset.load_from_df(ratings[['userid', 'movieid', 'rating']], reader)
     return data
 
-def train_svd_model():
-    """Entraîne le modèle SVD et le sauvegarde."""
+class SurpriseSVDWrapper(mlflow.pyfunc.PythonModel):
+    def __init__(self, algo):
+        self.algo = algo
+
+    def predict(self, context, model_input: pd.DataFrame):
+        # Vérifier que les colonnes attendues existent
+        if not {"user_id", "movie_id"}.issubset(model_input.columns):
+            raise ValueError("Le DataFrame doit contenir les colonnes 'user_id' et 'movie_id'")
+
+        preds = []
+        for _, row in model_input.iterrows():
+            est = self.algo.predict(str(row["user_id"]), str(row["movie_id"])).est
+            preds.append(est)
+
+        # Retourner une Series pour compatibilité avec .iloc
+        return pd.Series(preds)
+
+
+
+
+# ------------------- Méthodes utilitaires -------------------
+
+def load_and_prepare_data():
+    """Charge les ratings depuis la base et prépare le dataset Surprise."""
     ratings = load_ratings_from_db()
     data = prepare_surprise_dataset(ratings)
     trainset, testset = train_test_split(data, test_size=0.2, random_state=42)
-    algo = SVD(n_factors=50, n_epochs=20, lr_all=0.005, reg_all=0.02)
+    return ratings, trainset, testset
+
+
+def train_and_evaluate(trainset, testset, params):
+    """Entraîne le modèle SVD et calcule les métriques."""
+    algo = SVD(**params)
     algo.fit(trainset)
     predictions = algo.test(testset)
-    rmse = accuracy.rmse(predictions)
-    mae = accuracy.mae(predictions)
-    # Sauvegarde du modèle
+    rmse = accuracy.rmse(predictions, verbose=False)
+    mae = accuracy.mae(predictions, verbose=False)
+    return algo, rmse, mae
+
+
+def log_model_and_metrics(algo, params, rmse, mae, run):
+    """Log les paramètres, métriques et le modèle dans MLflow."""
+    mlflow.log_params(params)
+    mlflow.log_metrics({"rmse": rmse, "mae": mae})
+
+    # Sauvegarde locale
     with open(MODEL_FILE, "wb") as f:
         pickle.dump(algo, f)
-    return {"rmse": rmse, "mae": mae, "model_path": str(MODEL_FILE.resolve())}
+    mlflow.log_artifact(str(MODEL_FILE.resolve()), artifact_path="models")
+
+    input_example = pd.DataFrame({"user_id": ["u1"], "movie_id": ["i1"]})
+
+    # Log du modèle dans le run
+    artifact_path = "svd_model_artifact"
+    mlflow.pyfunc.log_model(
+        artifact_path=artifact_path,
+        python_model=SurpriseSVDWrapper(algo),
+        input_example=input_example,
+        signature=mlflow.models.infer_signature(input_example, [3.5])
+    )
+    return artifact_path
+
+
+def promote_model_with_comparison(client, run, artifact_path, rmse, mae):
+    """
+    Compare le nouveau modèle avec celui en production.
+    Si le nouveau est meilleur sur RMSE ET MAE, il passe en Production.
+    Sinon, il reste en Staging.
+    """
+    try:
+        client.create_registered_model("svd_model")
+    except Exception:
+        pass  # déjà créé
+
+    # Créer une nouvelle version dans le Model Registry
+    model_uri = f"runs:/{run.info.run_id}/{artifact_path}"
+    mv = client.create_model_version(
+        name="svd_model",
+        source=model_uri,
+        run_id=run.info.run_id
+    )
+    new_version = int(mv.version)
+
+    # Récupérer le modèle actuellement en production
+    try:
+        prod_version_info = client.get_model_version_by_alias("svd_model", "production")
+    except Exception:
+        prod_version_info = None
+
+    if prod_version_info:
+        prod_version = int(prod_version_info.version)
+        prod_run_id = prod_version_info.run_id
+
+        # Charger les métriques du modèle en production
+        prod_run = client.get_run(prod_run_id)
+        prod_rmse = float(prod_run.data.metrics.get("rmse", 9999))
+        prod_mae = float(prod_run.data.metrics.get("mae", 9999))
+
+        # Comparaison multi-métriques
+        if rmse < prod_rmse and mae < prod_mae:
+            # Nouveau meilleur sur les deux métriques → promotion
+            client.set_registered_model_alias("svd_model", "production", new_version)
+            client.set_registered_model_alias("svd_model", "staging", prod_version)
+            stage = "Production"
+            logger.info(f"Nouveau modèle (v{new_version}) promu en Production. Ancien (v{prod_version}) rétrogradé en Staging.")
+        else:
+            # Nouveau moins bon → staging
+            client.set_registered_model_alias("svd_model", "staging", new_version)
+            stage = "Staging"
+            logger.info(f"Nouveau modèle (v{new_version}) placé en Staging. Production reste v{prod_version}.")
+    else:
+        # Aucun modèle en production → premier modèle devient Production
+        client.set_registered_model_alias("svd_model", "production", new_version)
+        stage = "Production"
+        logger.info(f"Premier modèle (v{new_version}) promu en Production.")
+
+    return stage
+
+
+
+
+
+# ------------------- Fonction principale -------------------
+
+def train_svd_model():
+    """Pipeline complet d'entraînement, log et promotion du modèle SVD."""
+    logger.info("===== Début de l'entraînement du modèle SVD =====")
+
+    try:
+        # 1. Charger et préparer les données
+        ratings, trainset, testset = load_and_prepare_data()
+
+        # 2. Définir les hyperparamètres
+        params = {"n_factors": 50, "n_epochs": 20, "lr_all": 0.005, "reg_all": 0.02}
+
+        # 3. Entraîner et évaluer
+        with mlflow.start_run() as run:
+            algo, rmse, mae = train_and_evaluate(trainset, testset, params)
+
+            # 4. Logger modèle et métriques
+            artifact_path = log_model_and_metrics(algo, params, rmse, mae, run)
+
+            # 5. Promotion automatique
+            client = MlflowClient()
+            stage = promote_model_with_comparison(client, run, artifact_path, rmse, mae)
+
+        logger.info(f"Modèle promu automatiquement avec alias {stage}")
+        logger.info("===== Fin de l'entraînement du modèle SVD =====")
+
+        return {
+            "rmse": rmse,
+            "mae": mae,
+            "model_path": str(MODEL_FILE.resolve()),
+            "mlflow_run_id": run.info.run_id,
+            "params": params,
+            "n_ratings": len(ratings),
+            "alias": stage
+        }
+
+    except Exception as e:
+        logger.error(f"Erreur pendant l'entraînement : {e}")
+        raise
+
+
+
 
 def load_model():
-    """Charge le modèle sauvegardé."""
-    if not MODEL_FILE.exists():
-        raise FileNotFoundError(f"Le modèle n'existe pas : {MODEL_FILE.resolve()}")
-    with open(MODEL_FILE, "rb") as f:
-        algo = pickle.load(f)
-    return algo
+    """
+    Charge le modèle SVD en Production depuis le MLflow Model Registry.
+    Retourne l'objet PythonModel prêt à être utilisé pour la prédiction.
+    """
+    try:
+        # Charger le modèle en Production
+        model = mlflow.pyfunc.load_model("models:/svd_model@production")
+        return model
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impossible de charger le modèle Production: {str(e)}")
+
+
 
 def check_and_update_daily_counts(conn, force_insert=False):
     """Vérifie et met à jour la table daily_counts. Retourne True si une insertion est nécessaire."""
@@ -231,17 +407,39 @@ def predict(req: PredictRequest):
     Prédit la note pour un user_id et movie_id donnés.
     """
     try:
-        algo = load_model()
-        prediction = algo.predict(req.user_id, req.movie_id)
-        return {
+        logger.info("Appel à l'endpoint /predict")
+        logger.debug(f"Requête reçue: user_id={req.user_id}, movie_id={req.movie_id}")
+
+        model = load_model()
+        logger.info("Modèle chargé depuis MLflow")
+
+        input_df = pd.DataFrame({
+            "user_id": [str(req.user_id)],
+            "movie_id": [str(req.movie_id)]
+        })
+        logger.debug(f"DataFrame construit pour la prédiction: {input_df}")
+
+        prediction = model.predict(input_df)
+        logger.debug(f"Résultat brut du modèle: {prediction}")
+
+        result = {
             "user_id": req.user_id,
             "movie_id": req.movie_id,
-            "predicted_rating": round(prediction.est, 2)
+            "predicted_rating": round(float(prediction.iloc[0]), 2)
         }
+        logger.info(f"Résultat final: {result}")
+
+        return result
+
     except FileNotFoundError as e:
+        logger.error(f"Modèle introuvable: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.exception("Erreur lors de la prédiction")
         raise HTTPException(status_code=500, detail=f"Erreur lors de la prédiction: {str(e)}")
+
+
+
 
 @app.post("/insert-data")
 def insert_data(request: DataInsertRequest = Body(...)):
