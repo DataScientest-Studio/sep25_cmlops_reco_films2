@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment variables
+.env
+.env.local
+
+# Documentation
+*.md
+LICENSE
+
+# Notebooks
+notebooks/
+*.ipynb
+
+# Tests
+tests/
+pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large data files
+data/raw/ml-20m/
+*.zip
+*.tar.gz
+
+# Reports
+reports/
+```
+
+---
+

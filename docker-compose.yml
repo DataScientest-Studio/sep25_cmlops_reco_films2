@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Service API FastAPI
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: recofilm-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./mlruns:/app/mlruns
+      - ./models:/app/models
+    networks:
+      - recofilm-network
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+
+   # Service MLflow Server
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    container_name: recofilm-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlruns
+    networks:
+      - recofilm-network
+    restart: unless-stopped
+
+# Volumes partagés
+volumes:
+  mlruns:
+  models:
+
+# Réseau interne avec IPv6 activé
+networks:
+  recofilm-network:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+        - subnet: fd00:dead:beef::/48

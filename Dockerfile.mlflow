@@ -1,0 +1,15 @@
+FROM python:3.13-slim
+
+WORKDIR /mlruns
+
+# Installer MLflow
+RUN pip install --no-cache-dir mlflow==2.19.0
+
+# Exposer le port
+EXPOSE 5000
+
+# Commande de démarrage avec bind explicite
+CMD ["mlflow", "server", \
+     "--backend-store-uri", "file:///mlruns", \
+     "--host", "0.0.0.0", \
+     "--port", "5000"]

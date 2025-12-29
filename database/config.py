@@ -1,7 +1,9 @@
 """
 Configuration pour la connexion PostgreSQL
+Version avec force IPv4 pour Docker
 """
 import os
+import socket
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import execute_batch
@@ -12,9 +14,24 @@ load_dotenv()
 def get_connection():
     """
     Retourne une connexion PostgreSQL
+    Force IPv4 pour éviter les problèmes de réseau dans Docker
     """
+    db_host = os.getenv("DB_HOST")
+    
+    # Résoudre le hostname en IPv4 seulement
+    try:
+        ipv4_address = socket.getaddrinfo(
+            db_host, 
+            None, 
+            socket.AF_INET  # Force IPv4
+        )[0][4][0]
+        print(f"[INFO] Résolution DNS: {db_host} -> {ipv4_address}")
+    except Exception as e:
+        print(f"[WARNING] Erreur résolution DNS: {e}, utilisation du hostname")
+        ipv4_address = db_host
+    
     return psycopg2.connect(
-        host=os.getenv("DB_HOST"),
+        host=ipv4_address,  # Utilise l'adresse IPv4 résolue
         port=os.getenv("DB_PORT"),
         database=os.getenv("DB_NAME"),
         user=os.getenv("DB_USER"),
