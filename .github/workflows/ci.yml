@@ -28,4 +28,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
         run: |
-          pytest tests/test_api_trainer.py
+          pytest ./trainer/tests/test_api_trainer.py
