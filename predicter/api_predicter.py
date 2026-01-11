@@ -1,79 +1,143 @@
 """
 app.py
-API FastAPI pour prédire avec un modèle SVD exporté dans /models
+API FastAPI pour prédire avec un modèle SVD chargé
+directement depuis MLflow Model Registry (alias Production)
 """
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from pathlib import Path
-import pickle
 import pandas as pd
 import logging
+import os
+import mlflow
+import mlflow.pyfunc
+from functools import lru_cache
 
 # -----------------------------
-# CONFIG
+# CONFIGURATION
 # -----------------------------
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-MODELS_DIR = BASE_DIR / "models"
-MODEL_FILE = MODELS_DIR / "svd_model.pkl"
+
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI","http://mlflow:5000")
+
+if not MLFLOW_TRACKING_URI:
+    raise RuntimeError("La variable d'environnement MLFLOW_TRACKING_URI n'est pas définie")
+
+MODEL_URI = "models:/svd_model@production"
+
+# -----------------------------
+# LOGGING
+# -----------------------------
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("api.log", mode="a")
+        logging.StreamHandler()
     ]
 )
+
 logger = logging.getLogger(__name__)
 
 # -----------------------------
 # FASTAPI INITIALIZATION
 # -----------------------------
-app = FastAPI(title="Recommandation Film API")
+
+app = FastAPI(
+    title="Recommandation Film API",
+    description="API de prédiction utilisant le modèle MLflow en Production",
+    version="1.0.0"
+)
 
 # -----------------------------
-# MODELS
+# SCHEMAS
 # -----------------------------
+
 class PredictRequest(BaseModel):
-    user_id: int
-    movie_id: int
+    userid: int
+    movieid: int
 
+class PredictResponse(BaseModel):
+    userid: int
+    movieid: int
+    predicted_rating: float
+
+# -----------------------------
+# MODEL LOADING
+# -----------------------------
+
+@lru_cache(maxsize=1)
 def load_model():
-    """Charge le modèle SVD exporté en local."""
+    """
+    Charge le modèle depuis MLflow Model Registry (alias Production).
+    Le modèle est mis en cache mémoire.
+    """
     try:
-        with open(MODEL_FILE, "rb") as f:
-            model = pickle.load(f)
+        logger.info("Connexion à MLflow...")
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+        logger.info(f"Chargement du modèle MLflow : {MODEL_URI}")
+        model = mlflow.pyfunc.load_model(MODEL_URI)
+
+        logger.info("Modèle chargé avec succès depuis MLflow")
         return model
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Modèle introuvable dans /models")
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur de chargement du modèle: {str(e)}")
+        logger.exception("Erreur lors du chargement du modèle MLflow")
+        raise RuntimeError(str(e))
 
 # -----------------------------
 # API ENDPOINTS
 # -----------------------------
-@app.post("/predict")
-def predict(req: PredictRequest):
-    """Prédit la note pour un user_id et movie_id donnés."""
+
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "Recommandation Film API is running"}
+
+@app.get("/health")
+def health():
+    """
+    Vérifie que l'API et le modèle MLflow sont opérationnels.
+    """
     try:
-        logger.info("Appel à l'endpoint /predict")
+        load_model()
+        return {"status": "healthy", "model": "loaded"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+
+@app.post("/predict", response_model=PredictResponse)
+def predict(req: PredictRequest):
+    """
+    Prédit la note pour un utilisateur et un film donnés.
+    """
+    try:
         model = load_model()
-        logger.info("Modèle chargé depuis /models")
 
         input_df = pd.DataFrame({
-            "user_id": [str(req.user_id)],
-            "movie_id": [str(req.movie_id)]
+            "userid": [req.userid],
+            "movieid": [req.movieid]
         })
 
         prediction = model.predict(input_df)
-        result = {
-            "user_id": req.user_id,
-            "movie_id": req.movie_id,
+
+        return {
+            "userid": req.userid,
+            "movieid": req.movieid,
             "predicted_rating": round(float(prediction.iloc[0]), 2)
         }
-        logger.info(f"Résultat final: {result}")
-        return result
 
     except Exception as e:
         logger.exception("Erreur lors de la prédiction")
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la prédiction: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/reload-model")
+def reload_model():
+    """
+    Force le rechargement du modèle depuis MLflow (utile après une promotion).
+    """
+    try:
+        load_model.cache_clear()
+        load_model()
+        return {"status": "success", "message": "Modèle rechargé depuis MLflow"}
+    except Exception as e:
+        logger.exception("Erreur lors du rechargement du modèle")
+        raise HTTPException(status_code=500, detail=str(e))
