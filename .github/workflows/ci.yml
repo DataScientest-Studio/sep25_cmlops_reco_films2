@@ -19,7 +19,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r ./trainer/requirements.txt
+	  pip install -r ./predicter/requirements.txt
+	  pip install -r ./mlflow/requirements.txt
 
       - name: Run tests
         env:
