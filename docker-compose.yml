@@ -1,0 +1,59 @@
+services:
+  movie_mlflow:
+    build:
+      context: ./mlflow   # dossier où se trouve ton Dockerfile MLflow
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./models:/app/models
+      - ./shared:/app/shared
+    networks:
+      - mlflow-net
+    environment:
+      - MLFLOW_SERVER_ALLOWED_HOSTS=*
+    command: >
+      mlflow server
+      --backend-store-uri=sqlite:///mlflow.db
+      --default-artifact-root=/app/models
+      --host=0.0.0.0
+      --port=5000
+      --allowed-hosts=${MLFLOW_SERVER_ALLOWED_HOSTS}
+
+
+  movie_trainer_api:
+    build:
+      context: ./trainer
+    container_name: trainer_api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - movie_mlflow
+    networks:
+      - mlflow-net
+    environment:
+      - .env
+    volumes:
+      - ./models:/app/models
+      - ./shared:/app/shared
+      
+  movie_predicter_api:
+    build:
+      context: ./predicter
+    container_name: predicter
+    ports:
+      - "8001:8000"
+    depends_on:
+      - movie_trainer_api
+      - movie_mlflow
+    networks:
+      - mlflow-net
+    environment:
+      - .env
+    volumes:
+      - ./models:/app/models
+      - ./shared:/app/shared
+
+networks:
+  mlflow-net:
+    driver: bridge
