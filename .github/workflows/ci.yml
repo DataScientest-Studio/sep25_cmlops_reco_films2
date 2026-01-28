@@ -13,7 +13,6 @@ docker-integration-test:
           echo "DATABASE_URL=${{ secrets.SUPABASE_DATABASE_URL }}" > .env
           echo "MLFLOW_SERVER_ALLOWED_HOSTS=*" >> .env
           echo "MLFLOW_TRACKING_URI=http://mlflow:5000" >> .env
-
       - name: Build Docker images
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
