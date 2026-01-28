@@ -107,14 +107,19 @@ jobs:
         run: |
           docker compose ps
 
-      - name: Check logs for errors
+      - name: Show logs for all services
+        if: always()
         run: |
           echo "=== Trainer API logs ==="
-          docker compose logs trainer_api
+          docker compose logs movie_trainer_api || echo "No trainer logs"
+          echo ""
           echo "=== Predicter API logs ==="
-          docker compose logs predicter
+          docker compose logs movie_predicter_api || echo "No predicter logs"
+          echo ""
           echo "=== MLflow logs ==="
-          docker compose logs mlflow
+          docker compose logs movie_mlflow || echo "No mlflow logs"
+          
+          
 
       - name: Test services are responding
         run: |
