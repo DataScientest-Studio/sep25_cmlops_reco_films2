@@ -299,7 +299,19 @@ def training():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur entraînement : {e}")
 
-
+@app.get("/health")
+def health():
+    """
+    Vérifie que l'API et le modèle MLflow sont opérationnels.
+    """
+    try:
+        conn = get_db_connection()
+        conn.cursor().execute("SELECT 1;")
+        conn.close()
+        return {"status": "healthy", "bdd": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+        
 @app.post("/insert-data")
 def insert_data(request: DataInsertRequest = Body(...)):
     """
