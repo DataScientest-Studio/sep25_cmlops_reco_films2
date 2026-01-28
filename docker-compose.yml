@@ -1,7 +1,7 @@
 services:
   movie_mlflow:
     build:
-      context: ./mlflow   # dossier où se trouve ton Dockerfile MLflow
+      context: ./mlflow
     container_name: mlflow
     ports:
       - "5000:5000"
@@ -18,8 +18,7 @@ services:
       --default-artifact-root=/app/models
       --host=0.0.0.0
       --port=5000
-      --allowed-hosts=${MLFLOW_SERVER_ALLOWED_HOSTS}
-
+      --allowed-hosts=*
 
   movie_trainer_api:
     build:
@@ -32,7 +31,8 @@ services:
     networks:
       - mlflow-net
     environment:
-      - .env
+      - DATABASE_URL=${DATABASE_URL}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
     volumes:
       - ./models:/app/models
       - ./shared:/app/shared
@@ -49,7 +49,8 @@ services:
     networks:
       - mlflow-net
     environment:
-      - .env
+      - DATABASE_URL=${DATABASE_URL}
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
     volumes:
       - ./models:/app/models
       - ./shared:/app/shared
