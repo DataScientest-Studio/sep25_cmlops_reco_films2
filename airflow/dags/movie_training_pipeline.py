@@ -5,7 +5,7 @@ import requests
 import logging
 
 # Configuration
-TRAINER_API_URL = "http://trainer_api:8000"
+TRAINER_API_URL = "http://movie_trainer_api:8000"
 
 default_args = {
     'owner': 'airflow',
@@ -53,7 +53,7 @@ def trigger_training():
     logging.info("🚀 Déclenchement du training...")
     
     response = requests.post(
-        f"{TRAINER_API_URL}/train",
+        f"{TRAINER_API_URL}/training",
         json={
             "model_type": "svd",
             "params": {
