@@ -1,4 +1,79 @@
-docker-integration-test:
+name: CI
+
+on:
+  push:
+    branches: [ "projet-yms" ]
+  pull_request:
+    branches: [ "projet-yms" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install linting tools
+        run: |
+          pip install --upgrade pip
+          pip install flake8 black isort
+
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Check code formatting with black
+        run: |
+          black --check .
+
+      - name: Check import sorting with isort
+        run: |
+          isort --check-only .
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r trainer/requirements.txt
+          pip install -r predicter/requirements.txt
+          pip install -r mlflow/requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          pytest ./trainer/test/test_api_trainer.py -v --cov --cov-report=term-missing
+
+      - name: Upload coverage reports
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  docker-integration-test:
     runs-on: ubuntu-latest
     needs: test
 
@@ -11,36 +86,45 @@ docker-integration-test:
       - name: Create .env file for testing
         run: |
           echo "DATABASE_URL=${{ secrets.SUPABASE_DATABASE_URL }}" > .env
-          echo "MLFLOW_SERVER_ALLOWED_HOSTS=*" >> .env
           echo "MLFLOW_TRACKING_URI=http://mlflow:5000" >> .env
+          echo "MLFLOW_SERVER_ALLOWED_HOSTS=*" >> .env
+
       - name: Build Docker images
-        env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
         run: |
           docker compose build
 
       - name: Start services with docker-compose
-        env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
         run: |
           docker compose up -d
 
       - name: Wait for services to be ready
         run: |
+          echo "Waiting for services to start..."
           sleep 45
+
+      - name: Check container status
+        run: |
           docker compose ps
 
       - name: Check logs for errors
         run: |
+          echo "=== Trainer API logs ==="
           docker compose logs trainer_api
+          echo "=== Predicter API logs ==="
           docker compose logs predicter
+          echo "=== MLflow logs ==="
           docker compose logs mlflow
 
       - name: Test services are responding
         run: |
-          curl -f http://localhost:8000/health || echo "Trainer API not responding"
-          curl -f http://localhost:8001/health || echo "Predicter API not responding"
-          curl -f http://localhost:5000/health || echo "MLflow not responding"
+          echo "Testing trainer API..."
+          curl -f http://localhost:8000/health || echo "⚠️ Trainer API not responding on port 8000"
+          
+          echo "Testing predicter API..."
+          curl -f http://localhost:8001/health || echo "⚠️ Predicter API not responding on port 8001"
+          
+          echo "Testing MLflow..."
+          curl -f http://localhost:5000/health || echo "⚠️ MLflow not responding on port 5000"
 
       - name: Cleanup - Stop and remove containers
         if: always()
