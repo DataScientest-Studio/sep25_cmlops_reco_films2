@@ -64,7 +64,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
         run: |
-          pytest ./trainer/tests/test_api_trainer.py -v --cov --cov-report=term-missing
+          pytest ./trainer/test/test_api_trainer.py -v --cov --cov-report=term-missing
 
       - name: Upload coverage reports
         if: always()
