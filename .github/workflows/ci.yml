@@ -91,28 +91,29 @@ jobs:
 
       - name: Build Docker images
         run: |
-          docker-compose build
+          docker compose build
 
       - name: Start services with docker-compose
         run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: Wait for services to be ready
         run: |
           sleep 30
-          docker-compose ps
+          docker compose ps
 
       - name: Check service health
         run: |
-          docker-compose ps
-          docker-compose logs
+          docker compose ps
+          docker compose logs
 
       - name: Test services are responding
         run: |
+          # Vérifier que les services répondent
           curl -f http://localhost:8000/health || exit 1
           curl -f http://localhost:5000/health || exit 1
 
       - name: Cleanup - Stop and remove containers
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
