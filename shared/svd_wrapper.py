@@ -1,5 +1,6 @@
-import pandas as pd
 import mlflow.pyfunc
+import pandas as pd
+
 
 class SurpriseSVDWrapper(mlflow.pyfunc.PythonModel):
     def __init__(self, algo):
@@ -16,4 +17,3 @@ class SurpriseSVDWrapper(mlflow.pyfunc.PythonModel):
             preds.append(est)
 
         return pd.Series(preds)
-

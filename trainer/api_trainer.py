@@ -3,23 +3,24 @@ app.py
 API FastAPI pour entraîner et servir un modèle de recommandation SVD via MLflow
 """
 
-from fastapi import FastAPI, HTTPException, Body
-from pydantic import BaseModel
-import pandas as pd
-from surprise import Dataset, Reader, SVD
-from surprise.model_selection import train_test_split
-from surprise import accuracy
-from sqlalchemy import create_engine
-from dotenv import load_dotenv
+import logging
 import os
 from datetime import date
-import psycopg2
-import mlflow
+from pathlib import Path
+
 import mlflow.pyfunc
-import logging
+import pandas as pd
+import psycopg2
+from dotenv import load_dotenv
+from fastapi import Body, FastAPI, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import create_engine
+from surprise import SVD, Dataset, Reader, accuracy
+from surprise.model_selection import train_test_split
+
+import mlflow
 from mlflow import MlflowClient
 from shared.svd_wrapper import SurpriseSVDWrapper
-from pathlib import Path
 
 # -----------------------------
 # CONFIG
@@ -40,8 +41,7 @@ if not DATABASE_URL:
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -50,11 +50,13 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 app = FastAPI(title="Training & Serving SVD Model API")
 
+
 # -----------------------------
 # MODELS
 # -----------------------------
 class DataInsertRequest(BaseModel):
     force_insert: bool = False
+
 
 # -----------------------------
 # DATABASE HELPERS
@@ -62,30 +64,30 @@ class DataInsertRequest(BaseModel):
 def get_db_engine():
     return create_engine(DATABASE_URL)
 
+
 def get_db_connection():
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = False
     return conn
 
+
 def load_ratings_from_db():
     engine = get_db_engine()
     try:
         return pd.read_sql(
-            "SELECT userid, movieid, rating FROM ratings_preprocessed",
-            engine
+            "SELECT userid, movieid, rating FROM ratings_preprocessed", engine
         )
     finally:
         engine.dispose()
+
 
 # -----------------------------
 # SURPRISE DATASET
 # -----------------------------
 def prepare_surprise_dataset(ratings: pd.DataFrame):
     reader = Reader(rating_scale=RATING_SCALE)
-    return Dataset.load_from_df(
-        ratings[["userid", "movieid", "rating"]],
-        reader
-    )
+    return Dataset.load_from_df(ratings[["userid", "movieid", "rating"]], reader)
+
 
 # -----------------------------
 # TRAINING PIPELINE
@@ -98,24 +100,20 @@ def train_and_evaluate(trainset, testset, params):
     mae = accuracy.mae(predictions, verbose=False)
     return algo, rmse, mae
 
+
 def log_model_and_metrics(algo, params, rmse, mae):
     mlflow.log_params(params)
     mlflow.log_metrics({"rmse": rmse, "mae": mae})
 
-    input_example = pd.DataFrame({
-        "userid": [1],
-        "movieid": [1]
-    })
+    input_example = pd.DataFrame({"userid": [1], "movieid": [1]})
 
     mlflow.pyfunc.log_model(
         artifact_path=MODEL_ARTIFACT_PATH,
         python_model=SurpriseSVDWrapper(algo),
         input_example=input_example,
-        signature=mlflow.models.infer_signature(
-            input_example,
-            pd.Series([3.5])
-        )
+        signature=mlflow.models.infer_signature(input_example, pd.Series([3.5])),
     )
+
 
 def promote_model(client: MlflowClient, run_id: str, rmse: float, mae: float):
     model_uri = f"runs:/{run_id}/{MODEL_ARTIFACT_PATH}"
@@ -125,11 +123,7 @@ def promote_model(client: MlflowClient, run_id: str, rmse: float, mae: float):
     except Exception:
         pass
 
-    mv = client.create_model_version(
-        name=MODEL_NAME,
-        source=model_uri,
-        run_id=run_id
-    )
+    mv = client.create_model_version(name=MODEL_NAME, source=model_uri, run_id=run_id)
     new_version = int(mv.version)
 
     try:
@@ -151,6 +145,7 @@ def promote_model(client: MlflowClient, run_id: str, rmse: float, mae: float):
 
     return stage
 
+
 def train_svd_model():
     logger.info("=== Entraînement SVD ===")
 
@@ -158,12 +153,7 @@ def train_svd_model():
     data = prepare_surprise_dataset(ratings)
     trainset, testset = train_test_split(data, test_size=0.2, random_state=42)
 
-    params = {
-        "n_factors": 50,
-        "n_epochs": 20,
-        "lr_all": 0.005,
-        "reg_all": 0.02
-    }
+    params = {"n_factors": 50, "n_epochs": 20, "lr_all": 0.005, "reg_all": 0.02}
 
     mlflow.set_experiment("reco_movie_ms")
 
@@ -174,27 +164,19 @@ def train_svd_model():
         client = MlflowClient()
         stage = promote_model(client, run.info.run_id, rmse, mae)
 
-    return {
-        "rmse": rmse,
-        "mae": mae,
-        "run_id": run.info.run_id,
-        "alias": stage
-    }
+    return {"rmse": rmse, "mae": mae, "run_id": run.info.run_id, "alias": stage}
+
 
 # -----------------------------
 # MODEL LOADING (PRODUCTION)
 # -----------------------------
 def load_production_model():
     try:
-        return mlflow.pyfunc.load_model(
-            f"models:/{MODEL_NAME}@production"
-        )
+        return mlflow.pyfunc.load_model(f"models:/{MODEL_NAME}@production")
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Erreur chargement modèle MLflow : {e}"
+            status_code=500, detail=f"Erreur chargement modèle MLflow : {e}"
         )
-
 
 
 # -----------------------------
@@ -226,7 +208,7 @@ def check_and_update_daily_counts(conn, force_insert=False):
                 needs_insertion = False  # Même date, ne pas insérer de données
         conn.commit()
         return needs_insertion, count
-        
+
 
 def get_csv_file_size(table_name):
     """Retourne le nombre total de lignes dans le fichier CSV."""
@@ -237,10 +219,11 @@ def get_csv_file_size(table_name):
         raise FileNotFoundError(f"Fichier non trouvé: {csv_path}")
 
     # Compter le nombre de lignes dans le fichier CSV
-    with open(csv_path, 'r') as f:
+    with open(csv_path, "r") as f:
         num_lines = sum(1 for line in f) - 1  # Soustraire 1 pour l'en-tête
     return num_lines
-    
+
+
 def insert_data_chunk(conn, table_name, count):
     """Insère un chunk de données dans la table spécifiée."""
     start_idx = count * CHUNK_SIZE
@@ -268,7 +251,7 @@ def insert_data_chunk(conn, table_name, count):
     table_columns = {
         "ratings": ["userId", "movieId", "rating", "timestamp"],
         "tags": ["userId", "movieId", "tag", "timestamp"],
-        "genome-scores": ["movieId", "tagId", "relevance"]
+        "genome-scores": ["movieId", "tagId", "relevance"],
     }
 
     if table_name not in table_columns:
@@ -287,19 +270,19 @@ def insert_data_chunk(conn, table_name, count):
             for _, row in chunk.iterrows():
                 cur.execute(
                     "INSERT INTO ratings (userid, movieid, rating, timestamp) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING;",
-                    (row['userId'], row['movieId'], row['rating'], row['timestamp'])
+                    (row["userId"], row["movieId"], row["rating"], row["timestamp"]),
                 )
         elif table_name == "tags":
             for _, row in chunk.iterrows():
                 cur.execute(
                     "INSERT INTO tags (userid, movieid, tag, timestamp) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING;",
-                    (row['userId'], row['movieId'], row['tag'], row['timestamp'])
+                    (row["userId"], row["movieId"], row["tag"], row["timestamp"]),
                 )
         elif table_name == "genome-scores":
             for _, row in chunk.iterrows():
                 cur.execute(
                     "INSERT INTO genome_scores (movieid, tagid, relevance) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING;",
-                    (row['movieId'], row['tagId'], row['relevance'])
+                    (row["movieId"], row["tagId"], row["relevance"]),
                 )
 
     conn.commit()
@@ -314,10 +297,8 @@ def training():
     try:
         return train_svd_model()
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur entraînement : {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erreur entraînement : {e}")
+
 
 @app.post("/insert-data")
 def insert_data(request: DataInsertRequest = Body(...)):
@@ -328,13 +309,15 @@ def insert_data(request: DataInsertRequest = Body(...)):
     conn = None
     try:
         conn = get_db_connection()
-        needs_insertion, count = check_and_update_daily_counts(conn, request.force_insert)
+        needs_insertion, count = check_and_update_daily_counts(
+            conn, request.force_insert
+        )
 
         if not needs_insertion and not request.force_insert:
             return {
                 "status": "no_insertion_needed",
                 "message": "La date est la même que celle du jour, aucune insertion effectuée.",
-                "count": count
+                "count": count,
             }
 
         tables = ["ratings", "tags", "genome-scores"]
@@ -346,25 +329,22 @@ def insert_data(request: DataInsertRequest = Body(...)):
                 results[table] = {
                     "inserted_rows": inserted_rows,
                     "start_idx": count * CHUNK_SIZE,
-                    "end_idx": count * CHUNK_SIZE + CHUNK_SIZE
+                    "end_idx": count * CHUNK_SIZE + CHUNK_SIZE,
                 }
             except Exception as e:
-                results[table] = {
-                    "error": str(e)
-                }
+                results[table] = {"error": str(e)}
 
-        return {
-            "status": "success",
-            "count": count,
-            "results": results
-        }
+        return {"status": "success", "count": count, "results": results}
     except Exception as e:
         if conn:
             conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Erreur lors de l'insertion: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erreur lors de l'insertion: {str(e)}"
+        )
     finally:
         if conn:
             conn.close()
+
 
 @app.get("/daily-counts")
 def get_daily_counts():
@@ -382,7 +362,10 @@ def get_daily_counts():
             id, date_val, count = result
             return {"id": id, "date": date_val, "count": count}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération des daily_counts: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la récupération des daily_counts: {str(e)}",
+        )
     finally:
         if conn:
             conn.close()

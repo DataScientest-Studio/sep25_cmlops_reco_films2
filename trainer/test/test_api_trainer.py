@@ -1,14 +1,17 @@
 # tests/test_api_trainer.py
 
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock
+
 from trainer import api_trainer as api  # Import corrigé pour ton arbo
 
 # -----------------------------
 # FASTAPI TEST CLIENT
 # -----------------------------
 client = TestClient(api.app)
+
 
 # -----------------------------
 # MOCK MLflow ET SURPRISE
@@ -20,12 +23,17 @@ def mock_mlflow_and_algo(monkeypatch):
     l'entraînement ne fasse rien de réel.
     """
     # Mock train_svd_model pour retourner des métriques fictives
-    monkeypatch.setattr(api, "train_svd_model", lambda: {
-        "rmse": 0.5,
-        "mae": 0.3,
-        "run_id": "mock_run_id",
-        "alias": "production"
-    })
+    monkeypatch.setattr(
+        api,
+        "train_svd_model",
+        lambda: {
+            "rmse": 0.5,
+            "mae": 0.3,
+            "run_id": "mock_run_id",
+            "alias": "production",
+        },
+    )
+
 
 # -----------------------------
 # MOCK DATABASE
@@ -46,7 +54,9 @@ def mock_db(monkeypatch):
     fake_cursor.fetchone.return_value = (1, "2026-01-11", 0)
 
     # /insert-data : check_and_update_daily_counts -> True + count = 0
-    monkeypatch.setattr(api, "check_and_update_daily_counts", lambda conn, force_insert=False: (True, 0))
+    monkeypatch.setattr(
+        api, "check_and_update_daily_counts", lambda conn, force_insert=False: (True, 0)
+    )
 
     # /insert-data : insert_data_chunk -> 5 lignes insérées par table
     monkeypatch.setattr(api, "insert_data_chunk", lambda conn, table, count: 5)
@@ -55,6 +65,7 @@ def mock_db(monkeypatch):
     monkeypatch.setattr(api, "get_db_connection", lambda: fake_conn)
 
     yield fake_conn
+
 
 # -----------------------------
 # TEST /training
@@ -68,6 +79,7 @@ def test_training_endpoint():
     assert data["run_id"] == "mock_run_id"
     assert data["alias"] == "production"
 
+
 # -----------------------------
 # TEST /insert-data
 # -----------------------------
@@ -79,6 +91,7 @@ def test_insert_data_endpoint():
     for table in ["ratings", "tags", "genome-scores"]:
         assert "inserted_rows" in data["results"][table]
         assert data["results"][table]["inserted_rows"] == 5
+
 
 # -----------------------------
 # TEST /daily-counts
