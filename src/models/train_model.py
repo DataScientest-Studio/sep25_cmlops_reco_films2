@@ -248,7 +248,8 @@ def main():
     output_dir = project_root / "models"
     
     # Configuration MLflow
-    mlflow.set_tracking_uri("file:///C:/Users/Bender/Documents/formation_inge_IA/projet MLOPS/Code/sep25_cmlops_reco_films2/mlruns")
+    #mlflow.set_tracking_uri("file:///C:/Users/Bender/Documents/formation_inge_IA/projet MLOPS/Code/sep25_cmlops_reco_films2/mlruns")
+    mlflow.set_tracking_uri("http://localhost:5000")
     mlflow.set_experiment("recofilm-knn-recommender")
     
     # Nom du modele dans le registry
@@ -302,7 +303,7 @@ def main():
             mlflow.log_metric("avg_test_distance", avg_distance)
             
             # Logger le modele dans MLflow
-            mlflow.sklearn.log_model(model, "model")
+            #mlflow.sklearn.log_model(model, "model")
             
             # Logger les artifacts (fichiers)
             mlflow.log_artifact(str(output_dir / "model.pkl"))
@@ -316,15 +317,15 @@ def main():
             print(f"   - Avg distance: {avg_distance:.4f}")
         
         # APRES la fin du run, enregistrer dans le Model Registry
-        model_version = register_model(MODEL_NAME, run_id, avg_distance)
+        #model_version = register_model(MODEL_NAME, run_id, avg_distance)
         
         # Comparer et promouvoir si meilleur
-        compare_and_promote(MODEL_NAME, model_version.version, avg_distance)
+        #compare_and_promote(MODEL_NAME, model_version.version, avg_distance)
         
         print("\n" + "=" * 60)
         print("ENTRAINEMENT TERMINE AVEC SUCCES")
         print("=" * 60)
-        print(f"\n[OK] Modele enregistre: {MODEL_NAME} v{model_version.version}")
+        #print(f"\n[OK] Modele enregistre: {MODEL_NAME} v{model_version.version}")
         print(f"[INFO] Pour voir le Model Registry:")
         print(f"   mlflow ui")
         print(f"   Puis aller dans 'Models' -> Colonne 'Aliases'")

@@ -1,190 +1,416 @@
-# Projet MLOps - Systeme de Recommandation de Films (RecoFilm)
+# RecoFilm - Système de Recommandation de Films MLOps
 
-Projet de systeme de recommandation de films utilisant MovieLens 20M, dans le cadre du cursus MLOps DataScientest.
+Projet MLOps de système de recommandation de films basé sur le dataset MovieLens 20M.
 
-## Description
-
-Ce projet implemente un systeme de recommandation de films utilisant :
-- **Collaborative Filtering** avec K-Nearest Neighbors
-- **Content-Based Filtering** base sur les genres et metadonnees
-- Architecture MLOps complete avec versioning, CI/CD, monitoring et API
-
-**Donnees** : MovieLens 20M (20 millions de notes, 27k films, 138k utilisateurs)
+[![CI Pipeline](https://github.com/DataScientest-Studio/sep25_cmlops_reco_films2/actions/workflows/ci.yaml/badge.svg)](https://github.com/DataScientest-Studio/sep25_cmlops_reco_films2/actions)
 
 ---
 
-## Setup du projet
+## Table des matières
+
+- [Présentation](#-présentation)
+- [Architecture](#-architecture)
+- [Technologies](#-technologies-utilisées)
+- [Installation](#-installation)
+- [Utilisation](#-utilisation)
+- [Structure du projet](#-structure-du-projet)
+- [Monitoring](#-monitoring)
+- [CI/CD](#-cicd)
+- [Équipe](#-équipe)
+
+---
+
+## Présentation
+
+RecoFilm est un système de recommandation de films complet implémentant les meilleures pratiques MLOps:
+
+- **API REST** FastAPI pour les prédictions en temps réel
+- **Monitoring** avec Prometheus & Grafana
+- **Détection de drift** automatique avec Evidently
+- **Réentraînement automatique** du modèle
+- **CI/CD** avec GitHub Actions
+- **Containerisation** Docker complète
+
+### Objectifs MLOps
+
+- Déploiement automatisé
+- Monitoring en temps réel
+- Détection et correction du data drift
+- Versioning des modèles avec MLflow
+- Tests automatisés
+- Documentation complète
+
+---
+
+## Architecture
+```
+┌─────────────────┐
+│   Utilisateur   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐      ┌──────────────┐
+│   API FastAPI   │◄────►│  PostgreSQL  │
+│   (Port 8000)   │      │  (Supabase)  │
+└────────┬────────┘      └──────────────┘
+         │
+         ├──────────────────┐
+         │                  │
+         ▼                  ▼
+┌─────────────────┐ ┌─────────────────┐
+│   Prometheus    │ │     MLflow      │
+│   (Port 9090)   │ │   (Port 5000)   │
+└────────┬────────┘ └─────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│     Grafana     │
+│   (Port 3000)   │
+└─────────────────┘
+```
+
+### Workflow MLOps
+```
+Données ──► Preprocessing ──► Training ──► Model Registry
+                                 │              │
+                                 ▼              ▼
+                            Evaluation ──► Deployment (API)
+                                               │
+                                               ▼
+                                          Monitoring
+                                               │
+                                               ▼
+                                      Drift Detection
+                                               │
+                                               ▼
+                                    Auto-Retraining ──┐
+                                               │      │
+                                               └──────┘
+```
+
+---
+
+## 🛠️ Technologies utilisées
+
+### Backend & API
+- **Python 3.13**
+- **FastAPI** - API REST
+- **PostgreSQL** (Supabase) - Base de données
+- **scikit-learn** - Modèle KNN
+
+### MLOps
+- **MLflow** - Tracking & Model Registry
+- **Evidently** - Détection de data drift
+- **APScheduler** - Planification auto-retrain
+
+### Monitoring
+- **Prometheus** - Collecte de métriques
+- **Grafana** - Visualisation
+
+### DevOps
+- **Docker & Docker Compose** - Containerisation
+- **GitHub Actions** - CI/CD
+- **pytest** - Tests automatisés
+
+---
+
+## Installation
+
+### Prérequis
+
+- Python 3.13+
+- Docker & Docker Compose
+- Git
 
 ### 1. Cloner le repository
-
 ```bash
 git clone https://github.com/DataScientest-Studio/sep25_cmlops_reco_films2.git
 cd sep25_cmlops_reco_films2
 ```
 
-### 2. Creer l'environnement virtuel
+### 2. Configuration environnement
 
+Créer un fichier `.env` à la racine:
+```env
+DB_HOST=db.mmjschyvinnqscoeijhn.supabase.co
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=votre_password
+```
+
+### 3. Lancer avec Docker
 ```bash
+# Build et démarrage
+docker-compose up -d
+
+# Vérifier que tout tourne
+docker-compose ps
+```
+
+### 4. Installation locale (optionnel)
+```bash
+# Créer environnement virtuel
 python -m venv venv
-```
+source venv/bin/activate  # Linux/Mac
+# ou
+venv\Scripts\activate  # Windows
 
-### 3. Activer l'environnement virtuel
-
-**Windows (Command Prompt)** :
-```bash
-venv\Scripts\activate.bat
-```
-
-**Windows (PowerShell)** :
-```bash
-venv\Scripts\activate
-```
-
-**Linux/Mac** :
-```bash
-source venv/bin/activate
-```
-
-### 4. Installer les dependances
-
-```bash
+# Installer dépendances
 pip install -r requirements.txt
 ```
 
 ---
 
-## Workflow de preparation des donnees
+## Utilisation
 
-### 1. Telecharger les donnees MovieLens 20M
+### API FastAPI
 
-```bash
-python src/data/download_data.py
+**Swagger UI:**
+```
+http://localhost:8000/docs
 ```
 
-Les donnees seront telechargees dans `data/raw/ml-20m/`.
-
-### 2. Creer la base de donnees SQLite
-
+**Endpoints principaux:**
 ```bash
-python database/init_db.py
+# Health check
+GET http://localhost:8000/health
+
+# Prédictions
+POST http://localhost:8000/predict
+{
+  "userId": 1,
+  "numRecommendations": 10
+}
+
+# Entraînement
+POST http://localhost:8000/training
 ```
 
-Cela creera `database/recofilm.db` avec les tables necessaires.
-
-### 3. Inserer les donnees dans la base
-
+**Exemple avec curl:**
 ```bash
-python src/data/ingest_data.py
+# Test predict
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{"userId": 1, "numRecommendations": 10}'
 ```
 
-Cette etape prend environ 3-5 minutes (20M de ratings a inserer).
+### Monitoring
 
-### 4. (Optionnel) Explorer les donnees
-
-Lancer Jupyter Notebook :
-```bash
-jupyter notebook
+**Grafana:**
+```
+http://localhost:3000
+Login: admin / admin
 ```
 
-Ouvrir `notebooks/exploration.ipynb` pour visualiser les statistiques des donnees.
+**Dashboards disponibles:**
+- Nombre de requêtes actives
+- Total des requêtes HTTP
+- Erreurs HTTP (4xx, 5xx)
+- Temps de réponse moyen
+
+**Prometheus:**
+```
+http://localhost:9090
+```
+
+**MLflow:**
+```
+http://localhost:5000
+```
+
+### Détection de Drift
+
+**Lancer la détection manuellement:**
+```bash
+python src/monitoring/drift_detection.py
+```
+
+**Rapports générés dans:** `reports/drift/`
+
+**Ouvrir les rapports HTML dans le navigateur**
+
+### Réentraînement Automatique
+
+**Lancer le réentraînement (si drift détecté):**
+```bash
+python src/monitoring/auto_retrain.py
+```
+
+**Planification automatique (tous les jours à 2h):**
+```bash
+python src/monitoring/schedule_retrain.py
+```
+
+**Logs de décision:** `logs/retrain/`
 
 ---
 
 ## Structure du projet
-
 ```
-├── database/              <- Base de donnees SQLite
-│   ├── init_db.py        <- Script de creation des tables
-│   └── recofilm.db       <- Base de donnees (non versionne)
+sep25_cmlops_reco_films2/
+│
+├── .github/
+│   └── workflows/          # CI/CD pipelines
+│       ├── ci.yaml         # Tests + Build
+│       └── release.yaml    # Déploiement
 │
 ├── data/
-│   ├── raw/              <- Donnees brutes MovieLens (non versionne)
-│   └── processed/        <- Donnees pretraitees (matrices)
+│   ├── raw/                # Données brutes MovieLens
+│   └── processed/          # Matrices preprocessées
 │
-├── models/               <- Modeles entraines (non versionne)
+├── database/
+│   ├── config.py           # Configuration PostgreSQL
+│   └── init_db_postgres.py # Initialisation DB
 │
-├── notebooks/            <- Notebooks Jupyter d'exploration
-│   └── exploration.ipynb
+├── grafana/
+│   └── provisioning/       # Config Grafana (persistence)
+│       ├── datasources/    # Prometheus datasource
+│       └── dashboards/     # Dashboards JSON
+│
+├── logs/
+│   └── retrain/            # Logs réentraînement auto
+│
+├── models/                 # Modèles ML sauvegardés
+│   ├── model.pkl
+│   └── movie_ids.pkl
+│
+├── reports/
+│   └── drift/              # Rapports Evidently HTML
 │
 ├── src/
-│   ├── data/            <- Scripts de gestion des donnees
-│   │   ├── download_data.py   <- Telechargement MovieLens
-│   │   ├── ingest_data.py     <- Ingestion en BDD
-│   │   └── preprocess.py      <- Preprocessing (a venir)
-│   │
-│   ├── models/          <- Scripts ML
-│   │   ├── train_model.py     <- Entrainement (a venir)
-│   │   └── predict_model.py   <- Predictions (a venir)
-│   │
-│   └── api/             <- API FastAPI (a venir)
-│       └── main.py
+│   ├── api/
+│   │   └── main.py         # API FastAPI
+│   ├── data/
+│   │   └── preprocess.py   # Preprocessing données
+│   ├── models/
+│   │   ├── train_model.py  # Script entraînement
+│   │   └── predict_model.py # Script prédiction
+│   └── monitoring/
+│       ├── drift_detection.py    # Détection drift
+│       ├── auto_retrain.py       # Réentraînement auto
+│       └── schedule_retrain.py   # Planification
 │
-├── requirements.txt     <- Dependances Python
-├── .gitignore          <- Fichiers a ignorer (donnees, venv, etc.)
-└── README.md           <- Ce fichier
+├── tests/                  # Tests unitaires
+│
+├── docker-compose.yml      # Orchestration services
+├── Dockerfile              # Image API
+├── Dockerfile.mlflow       # Image MLflow
+├── prometheus.yml          # Config Prometheus
+├── requirements.txt        # Dépendances Python
+└── README.md
 ```
 
 ---
 
-## Phases du projet
+## Monitoring
 
-### Phase 1 : Fondations (deadline : 3 novembre)
-- [x] Setup environnement
-- [x] Telechargement des donnees
-- [x] Exploration des donnees
-- [x] Base de donnees SQLite
-- [ ] Preprocessing (matrices)
-- [ ] Modele ML de base
-- [ ] API d'inference simple
+### Métriques collectées
 
-### Phase 2 : Suivi & Versionning (deadline : 5 decembre)
-- [ ] MLflow pour le tracking
-- [ ] Versionning des donnees/modeles
-- [ ] Comparaison des experiences
+**API Metrics:**
+- Nombre total de requêtes
+- Requêtes par seconde
+- Temps de réponse
+- Taux d'erreur (4xx, 5xx)
+- Requêtes actives
 
-### Phase 3 : Deploiement (deadline : 2 janvier)
-- [ ] Dockerisation
-- [ ] CI/CD avec GitHub Actions
-- [ ] Tests unitaires
+**Data Drift Metrics:**
+- Score de drift par feature
+- Distribution des données
+- Qualité des données
 
-### Phase 4 : Monitoring (deadline : 30 janvier)
-- [ ] Prometheus/Grafana
-- [ ] Detection de data drift (Evidently)
-- [ ] Re-entrainement automatique
+### Dashboards Grafana
 
-### Phase 5 : Frontend (deadline : 20 fevrier)
-- [ ] Application Streamlit
-
-**Soutenance** : 23 fevrier
+**4 panels principaux:**
+1. **Requêtes actives** - Surveillance en temps réel
+2. **Total requêtes HTTP** - Volume cumulé
+3. **Erreurs HTTP** - Détection anomalies
+4. **Temps de réponse** - Performance API
 
 ---
 
-## Technologies utilisees
+## Tests
 
-- **Python 3.13**
-- **pandas, numpy** - Manipulation de donnees
-- **scikit-learn** - Machine Learning
-- **SQLite** - Base de donnees
-- **FastAPI** - API REST
-- **Jupyter** - Exploration de donnees
-- **Git/GitHub** - Versionning
+### Tests unitaires
+```bash
+# Lancer tous les tests
+pytest
+
+# Tests avec coverage
+pytest --cov=src
+
+# Tests d'un module spécifique
+pytest tests/test_api.py
+```
+
+### Tests d'intégration
+```bash
+# Test API
+curl http://localhost:8000/health
+
+# Test prédiction
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"userId": 1, "numRecommendations": 10}'
+```
 
 ---
 
-## Ressources
+## CI/CD
 
-- [Dataset MovieLens 20M](https://grouplens.org/datasets/movielens/20m/)
-- [Template GitHub](https://github.com/DataScientest-Studio/Template_MLOps_movie_recommendation)
-- [Documentation projet](https://docs.google.com/presentation/d/1VENc3vnN3zI3Z4WsLV8Q_ePjRowdMU2bsB-ylyAQV60/)
+### Continuous Integration (CI)
+
+**Déclenché sur:** Chaque push
+
+**Pipeline:**
+1. Linter (code quality)
+2. Tests unitaires
+3. Build images Docker
+
+**Fichier:** `.github/workflows/ci.yaml`
+
+### Continuous Deployment (CD)
+
+**Déclenché sur:** Releases/Tags
+
+**Pipeline:**
+1. Linter
+2. Tests
+3. Build images
+4. Push sur DockerHub (si configuré)
+
+**Fichier:** `.github/workflows/release.yaml`
+
+### Créer une release
+```bash
+# Via Git
+git tag v1.0.0
+git push origin v1.0.0
+
+# Ou via GitHub UI
+# Releases → Create new release
+```
 
 ---
 
-## Notes importantes
+## Équipe
 
-- Les donnees (`data/raw/`), la base de donnees (`database/*.db`) et l'environnement virtuel (`venv/`) ne sont **pas versionnes** sur Git
-- Chaque membre de l'equipe doit recreer ces elements localement avec les scripts fournis
-- La taille de la BDD finale est d'environ **1.2 GB**
+**Formation:** DataScientest - MLOps Engineer
+
+**Projet:** RecoFilm - Système de recommandation MLOps
+
+**Mentor:** Nicolas
 
 ---
 
-<p><small>Projet base sur le template <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science</a></small></p>
+## 🔗 Liens utiles
+
+- [Documentation FastAPI](https://fastapi.tiangolo.com/)
+- [MLflow Documentation](https://mlflow.org/docs/latest/index.html)
+- [Evidently Documentation](https://docs.evidentlyai.com/)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [Grafana Documentation](https://grafana.com/docs/)
+
+---
+
+**Développé dans le cadre de la formation MLOps DataScientest**

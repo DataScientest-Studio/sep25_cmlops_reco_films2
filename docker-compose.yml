@@ -34,10 +34,48 @@ services:
       - recofilm-network
     restart: unless-stopped
 
+  
+
+# Service Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: recofilm-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - recofilm-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: recofilm-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - recofilm-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+  
+
 # Volumes partagés
 volumes:
   mlruns:
   models:
+  prometheus_data: 
+  grafana_data:
 
 # Réseau interne avec IPv6 activé
 networks:

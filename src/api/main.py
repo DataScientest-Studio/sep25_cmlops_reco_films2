@@ -5,11 +5,15 @@ Version PostgreSQL (Supabase)
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
+from prometheus_fastapi_instrumentator import Instrumentator
 import pandas as pd
 import pickle
 import subprocess
 from pathlib import Path
 import sys
+from prometheus_client import Gauge, REGISTRY
+import time
+
 
 # Ajout pour PostgreSQL
 sys.path.append(str(Path(__file__).parent.parent.parent / "database"))
@@ -22,6 +26,15 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Instrumenter Prometheus
+Instrumentator().instrument(app).expose(app)
+
+# Gauge pour les requêtes actives
+active_requests = Gauge(
+    'http_requests_in_progress',
+    'Number of HTTP requests currently being processed',
+    registry=REGISTRY
+)
 
 # Chemins globaux
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -148,6 +161,17 @@ def train_model():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.middleware("http")
+async def track_active_requests(request, call_next):
+    """
+    Middleware pour tracker le nombre de requêtes actives
+    """
+    active_requests.inc()  # Incrémenter au début de la requête
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        active_requests.dec()
 
 # Prediction endpoint
 @app.post("/predict", response_model=PredictionResponse)
