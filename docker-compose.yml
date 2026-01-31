@@ -74,6 +74,22 @@ services:
       - movie_mlflow
     restart: unless-stopped
 
+  streamlit-ui:
+    build: ./streamlit-ui
+    container_name: recofilm-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - KNN_API_URL=http://knn-api:8002/predict
+      - SVD_API_URL=http://movie_trainer_api:8000/predict
+      - SERVICE_TOKEN=knn-to-svd-secret
+    networks:
+      - mlflow-net
+    depends_on:
+      - knn_api
+      - movie_predicter_api
+
+
   postgres:
     image: postgres:15
     container_name: airflow_postgres
