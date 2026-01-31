@@ -57,13 +57,18 @@ app = FastAPI(
 
 class PredictRequest(BaseModel):
     userid: int
+    movieids: list[int]
+
+
+class MovieScore(BaseModel):
     movieid: int
+    predicted_rating: float
 
 
 class PredictResponse(BaseModel):
     userid: int
-    movieid: int
-    predicted_rating: float
+    ranked_movies: list[MovieScore]
+
 
 
 # -----------------------------
@@ -117,24 +122,43 @@ def health():
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
     """
-    Prédit la note pour un utilisateur et un film donnés.
+    Prédit les notes SVD pour une liste de films et retourne un ranking.
     """
     try:
         model = load_model()
 
-        input_df = pd.DataFrame({"userid": [req.userid], "movieid": [req.movieid]})
+        if not req.movieids:
+            raise HTTPException(status_code=400, detail="movieids list is empty")
 
-        prediction = model.predict(input_df)
+        # Construire le DataFrame batch
+        input_df = pd.DataFrame({
+            "userid": [req.userid] * len(req.movieids),
+            "movieid": req.movieids
+        })
+
+        # Prédictions SVD
+        predictions = model.predict(input_df)
+
+        # Construire la réponse
+        results = []
+        for movie_id, score in zip(req.movieids, predictions):
+            results.append({
+                "movieid": int(movie_id),
+                "predicted_rating": round(float(score), 3)
+            })
+
+        # Trier par note décroissante
+        results = sorted(results, key=lambda x: x["predicted_rating"], reverse=True)
 
         return {
             "userid": req.userid,
-            "movieid": req.movieid,
-            "predicted_rating": round(float(prediction.iloc[0]), 2),
+            "ranked_movies": results
         }
 
     except Exception as e:
-        logger.exception("Erreur lors de la prédiction")
+        logger.exception("Erreur lors de la prédiction batch")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/reload-model")
