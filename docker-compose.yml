@@ -47,7 +47,6 @@ services:
     ports:
       - "8001:8000"
     depends_on:
-      - movie_trainer_api
       - movie_mlflow
     networks:
       - mlflow-net
@@ -56,7 +55,25 @@ services:
       - ./shared:/app/shared
     env_file:
       - .env
-      
+
+  knn_api:
+    build:
+      context: ./knn_api
+      dockerfile: Dockerfile
+    container_name: knn-api
+    ports:
+      - "8002:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./models:/app/models
+      - ./shared:/app/shared
+    networks:
+      - mlflow-net
+    depends_on:
+      - movie_mlflow
+    restart: unless-stopped
+
   postgres:
     image: postgres:15
     container_name: airflow_postgres
@@ -174,7 +191,8 @@ services:
     
 volumes:
   postgres-db-volume:
-  
+  models:
+
 networks:
   mlflow-net:
     driver: bridge
