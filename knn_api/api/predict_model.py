@@ -190,12 +190,18 @@ def main():
     print("=" * 60)
     
     # Chemins
-    project_root = Path(__file__).parent.parent.parent
-    model_dir = project_root / "models"
-    user_matrix_path = project_root / "data" / "processed" / "user_matrix.csv"
-    movie_matrix_path = project_root / "data" / "processed" / "movie_matrix.csv"
-    db_path = project_root / "database" / "recofilm.db"
+    BASE_DIR = Path(__file__).resolve().parent
+
+    db_path = BASE_DIR / "database" / "recofilm.db"    
+    MOVIE_MATRIX_PATH = BASE_DIR / "movie_matrix.csv"
+    USER_MATRIX_PATH = BASE_DIR / "user_matrix.csv"
     
+    user_matrix_path = USER_MATRIX_PATH
+    movie_matrix_path = MOVIE_MATRIX_PATH
+    model_dir = BASE_DIR / "models"
+
+
+
     # Utilisateur de test (vous pouvez changer)
     test_user_id = 1
     num_recommendations = 10

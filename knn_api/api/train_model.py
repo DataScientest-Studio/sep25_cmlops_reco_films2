@@ -305,7 +305,7 @@ def main():
             mlflow.log_metric("avg_test_distance", avg_distance)
             
             # Logger le modele dans MLflow
-            #mlflow.sklearn.log_model(model, "model")
+            mlflow.sklearn.log_model(model, "model")
             
             # Logger les artifacts (fichiers)
             mlflow.log_artifact(str(output_dir / "model.pkl"))
