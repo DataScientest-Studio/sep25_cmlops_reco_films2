@@ -1,6 +1,8 @@
 """
 Script de prediction pour generer des recommandations de films
 """
+from mlflow import MlflowClient
+import mlflow
 import pandas as pd
 import numpy as np
 import pickle
@@ -21,11 +23,26 @@ def load_model(model_dir):
     """
     print("\n1. Chargement du modele...")
     
+    client = MlflowClient()
+    model_name = "recofilm-knn-recommender"
+
+    champion = client.get_model_version_by_alias(model_name, "champion")
+    run_id = champion.run_id
+
+    print("Champion version:", champion.version)
+    print("Run id:", run_id)
+
     model_path = model_dir / "model.pkl"
     ids_path = model_dir / "movie_ids.pkl"
     
-    if not model_path.exists():
-        raise FileNotFoundError(f"Modele non trouve: {model_path}")
+    local_dir = model_dir
+    local_dir.mkdir(exist_ok=True)
+
+    mlflow.artifacts.download_artifacts(
+        run_id=run_id,
+        path="",
+        dst_path=str(local_dir)
+    )
     
     with open(model_path, 'rb') as f:
         model = pickle.load(f)

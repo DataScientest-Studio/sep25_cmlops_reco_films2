@@ -3,6 +3,7 @@ API FastAPI pour le systeme de recommandation de films
 Version PostgreSQL (Supabase)
 """
 from fastapi import FastAPI, HTTPException
+import mlflow
 from pydantic import BaseModel
 from typing import List, Optional
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -69,6 +70,7 @@ active_requests = Gauge(
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "models"
 TRAIN_SCRIPT = BASE_DIR / "train_model.py"
+PREDICT_SCRIPT = BASE_DIR / "predict_model.py"
 USER_MATRIX_PATH = BASE_DIR / "user_matrix.csv"
 MOVIE_MATRIX_PATH = BASE_DIR / "movie_matrix.csv"
 
@@ -214,21 +216,28 @@ def predict(request: PredictionRequest):
         
         print(f"Generation de {num_recommendations} recommandations pour l'utilisateur {user_id}...")
         
-        # Verifier que le modele existe
-        model_path = MODEL_DIR / "model.pkl"
-        ids_path = MODEL_DIR / "movie_ids.pkl"
+        client = mlflow.MlflowClient()
+        model_name = "recofilm-knn-recommender"
+
+        champion = client.get_model_version_by_alias(model_name, "champion")
+        run_id = champion.run_id
+
+        print("Champion version:", champion.version)
+        print("Run id:", run_id)
+    
+        local_dir = MODEL_DIR
+        local_dir.mkdir(exist_ok=True)
+
+        mlflow.artifacts.download_artifacts(
+            run_id=run_id,
+            artifact_path="",
+            dst_path=str(local_dir)
+        )
         
-        if not model_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail="Modele non trouve. Executez /training d'abord."
-            )
-        
-        # Charger le modele
-        with open(model_path, 'rb') as f:
+        with open(local_dir/ "model.pkl", 'rb') as f:
             model = pickle.load(f)
         
-        with open(ids_path, 'rb') as f:
+        with open(local_dir/ "movie_ids.pkl", 'rb') as f:
             movie_ids = pickle.load(f)
         
         # Charger user_matrix
@@ -318,6 +327,7 @@ def predict(request: PredictionRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 if __name__ == "__main__":
