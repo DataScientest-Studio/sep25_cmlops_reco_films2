@@ -8,6 +8,7 @@ services:
     volumes:
       - ./models:/app/models
       - ./shared:/app/shared
+      - ./mlflow_data:/mlflow
     networks:
       - mlflow-net
     environment:
@@ -16,7 +17,7 @@ services:
       - .env
     command: >
       mlflow server
-      --backend-store-uri=sqlite:///mlflow.db
+      --backend-store-uri=sqlite:////mlflow/mlflow.db
       --default-artifact-root=/app/models
       --host=0.0.0.0
       --port=5000
