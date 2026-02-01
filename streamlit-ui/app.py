@@ -6,8 +6,8 @@ import os
 # CONFIGURATION
 # -----------------------------
 FASTAPI_TRAINING_URL = "http://movie_trainer_api:8000"
-FASTAPI_PREDICTION_URL = "http://predicter:8001"
-FASTAPI_KNN_URL = "http://knn-api:8002"
+FASTAPI_PREDICTION_URL = "http://movie_predicter_api:8000"
+FASTAPI_KNN_URL = "http://knn_api:8000"
 
 MOVIES_PER_PAGE = 5  # Nombre de films par page
 
@@ -84,12 +84,12 @@ else:
 
     with st.form("login_form"):
         username = st.text_input("Nom d'utilisateur", value="admin")
-        password = st.text_input("Mot de passe", type="password", value="secret")
+        password = st.text_input("Mot de passe", type="password", value="RecoFilm!2025")
         submitted = st.form_submit_button("Se connecter")
 
         if submitted:
             response = requests.post(
-                f"{FASTAPI_TRAINING_URL}/token",
+                f"{FASTAPI_KNN_URL}/token",
                 data={"username": username, "password": password}
             )
 

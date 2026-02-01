@@ -94,67 +94,6 @@ app = FastAPI(title="Training & Serving SVD Model API")
 
 
 # -----------------------------
-# Authentification
-# -----------------------------
-
-# Fonctions utilitaires
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return UserInDB(**user_dict)
-
-def authenticate_user(username: str, password: str):
-    user = get_user(fake_users_db, username)
-    if not user:
-        return False
-    if not verify_password(password, user.hashed_password):
-        return False
-    return user
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user = get_user(fake_users_db, username=token_data.username)
-    if user is None:
-        raise credentials_exception
-    return user
-
-def get_random_userid():
-    """Récupère un userid aléatoire depuis la base de données."""
-    conn = psycopg2.connect(DATABASE_URL)
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT userid FROM ratings ORDER BY RANDOM() LIMIT 1;")
-            result = cur.fetchone()
-            return result[0] if result else None
-    finally:
-        conn.close()
-
-# -----------------------------
 # MODELS
 # -----------------------------
 class DataInsertRequest(BaseModel):
@@ -396,23 +335,11 @@ def insert_data_chunk(conn, table_name, count):
 # API ENDPOINTS
 # -----------------------------
 @app.post("/training")
-def training(current_user: User = Depends(get_current_user)):
+def training():
     try:
         return train_svd_model()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur entraînement : {e}")
-
-@app.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer", "userid":get_random_userid()}
 
 @app.get("/health")
 def health():

@@ -80,7 +80,7 @@ services:
     ports:
       - "8501:8501"
     environment:
-      - KNN_API_URL=http://knn-api:8002/predict
+      - KNN_API_URL=http://knn_api:8002/predict
       - SVD_API_URL=http://movie_trainer_api:8000/predict
       - SERVICE_TOKEN=knn-to-svd-secret
     networks:
