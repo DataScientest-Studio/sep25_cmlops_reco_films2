@@ -10,7 +10,7 @@ from functools import lru_cache
 
 import mlflow.pyfunc
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
 import mlflow

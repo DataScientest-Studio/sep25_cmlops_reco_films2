@@ -50,6 +50,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 class Token(BaseModel):
     access_token: str
     token_type: str
+    userid: int
 
 class TokenData(BaseModel):
     username: Optional[str] = None
@@ -141,6 +142,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     if user is None:
         raise credentials_exception
     return user
+
+def get_random_userid():
+    """Récupère un userid aléatoire depuis la base de données."""
+    conn = psycopg2.connect(DATABASE_URL)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT userid FROM ratings ORDER BY RANDOM() LIMIT 1;")
+            result = cur.fetchone()
+            return result[0] if result else None
+    finally:
+        conn.close()
 
 # -----------------------------
 # MODELS
@@ -400,8 +412,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
-
+    return {"access_token": access_token, "token_type": "bearer", "userid":get_random_userid()}
 
 @app.get("/health")
 def health():
