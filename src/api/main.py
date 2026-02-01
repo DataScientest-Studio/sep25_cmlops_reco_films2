@@ -14,10 +14,25 @@ import sys
 from prometheus_client import Gauge, REGISTRY
 import time
 
+# Imports pour reload
+import threading
+from datetime import datetime
+import joblib
+
 
 # Ajout pour PostgreSQL
 sys.path.append(str(Path(__file__).parent.parent.parent / "database"))
 from config import get_connection
+
+
+# Variables globales pour le rechargement du modèle
+last_reload_time = None
+model_lock = threading.Lock()
+
+# Variables globales pour le modèle
+model = None
+movie_ids = None
+movies_df = None
 
 
 app = FastAPI(
@@ -73,7 +88,76 @@ class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     database_connected: bool
+    last_model_reload: Optional[str] = None
 
+
+def load_model_from_disk():
+    """
+    Charge le modèle et les données associées depuis le disque
+    
+    Returns:
+        tuple: (model, movie_ids, movies_df)
+    """
+    global last_reload_time
+    
+    print("🔄 Chargement du modèle...")
+    
+    model_path = MODEL_DIR / "model.pkl"
+    movie_ids_path = MODEL_DIR / "movie_ids.pkl"
+    
+    if not model_path.exists():
+        raise FileNotFoundError(f"Modèle non trouvé: {model_path}")
+    
+    if not movie_ids_path.exists():
+        raise FileNotFoundError(f"Movie IDs non trouvés: {movie_ids_path}")
+    
+    # Charger le modèle
+    with open(model_path, 'rb') as f:
+        loaded_model = pickle.load(f)
+    
+    with open(movie_ids_path, 'rb') as f:
+        loaded_movie_ids = pickle.load(f)
+    
+    # Charger les métadonnées des films depuis la DB
+    conn = get_connection()
+    loaded_movies_df = pd.read_sql_query("SELECT movieId, title, genres FROM movies", conn)
+    loaded_movies_df.columns = ['movieId', 'title', 'genres']
+    conn.close()
+    
+    last_reload_time = datetime.now()
+    print(f"✅ Modèle chargé avec succès à {last_reload_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    return loaded_model, loaded_movie_ids, loaded_movies_df
+
+
+# Chargement initial au démarrage
+print("🚀 Démarrage de l'API...")
+try:
+    model, movie_ids, movies_df = load_model_from_disk()
+except Exception as e:
+    print(f"⚠️ Impossible de charger le modèle au démarrage: {e}")
+    model, movie_ids, movies_df = None, None, None
+
+
+# ============================================================================
+# MIDDLEWARE
+# ============================================================================
+@app.middleware("http")
+async def track_active_requests(request, call_next):
+    """
+    Middleware pour tracker le nombre de requêtes actives
+    """
+    active_requests.inc()  # Incrémenter au début de la requête
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        active_requests.dec()
+
+
+# ============================================================================
+# ENDPOINTS
+# ============================================================================
 
 # Root endpoint
 @app.get("/")
@@ -88,18 +172,19 @@ def read_root():
             "/docs": "Documentation interactive Swagger",
             "/health": "Verifier l'etat de l'API",
             "/training": "POST - Entrainer le modele",
-            "/predict": "POST - Obtenir des recommandations"
+            "/predict": "POST - Obtenir des recommandations",
+            "/reload": "POST - Recharger le modele sans redemarrer"
         }
     }
 
 
-# Health check
+# Health check (AMÉLIORÉ avec info reload)
 @app.get("/health", response_model=HealthResponse)
 def health_check():
     """
     Verifie l'etat de l'API et des ressources
     """
-    model_exists = (MODEL_DIR / "model.pkl").exists()
+    model_loaded = model is not None
     
     try:
         conn = get_connection()
@@ -112,10 +197,60 @@ def health_check():
         db_ok = False
     
     return {
-        "status": "healthy" if (model_exists and db_ok) else "unhealthy",
-        "model_loaded": model_exists,
-        "database_connected": db_ok
+        "status": "healthy" if (model_loaded and db_ok) else "degraded",
+        "model_loaded": model_loaded,
+        "database_connected": db_ok,
+        "last_model_reload": last_reload_time.isoformat() if last_reload_time else None
     }
+
+
+# NOUVEL ENDPOINT: Reload model
+@app.post("/reload", tags=["Admin"])
+async def reload_model():
+    """
+    Recharge le modèle sans redémarrer l'API
+    
+    Utile après un réentraînement pour mettre à jour le modèle en production
+    sans interruption de service (zero-downtime deployment).
+    
+    Returns:
+        dict: Statut du rechargement avec timestamps et informations du modèle
+    
+    Raises:
+        HTTPException: Si le modèle ne peut pas être chargé
+    """
+    global model, movie_ids, movies_df
+    
+    try:
+        old_reload_time = last_reload_time
+        
+        # Recharger avec un lock pour éviter les conflits
+        with model_lock:
+            model, movie_ids, movies_df = load_model_from_disk()
+        
+        return {
+            "status": "success",
+            "message": "Modèle rechargé avec succès",
+            "previous_load": old_reload_time.isoformat() if old_reload_time else None,
+            "current_load": last_reload_time.isoformat(),
+            "model_info": {
+                "n_samples": model.n_samples_fit_ if hasattr(model, 'n_samples_fit_') else "N/A",
+                "n_features": model.n_features_in_ if hasattr(model, 'n_features_in_') else "N/A",
+                "n_movies": len(movie_ids) if movie_ids is not None else 0
+            }
+        }
+    
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Modèle non trouvé: {str(e)}"
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors du rechargement: {str(e)}"
+        )
 
 
 # Training endpoint
@@ -150,7 +285,7 @@ def train_model():
                 detail=f"Erreur lors de l'entrainement: {result.stderr}"
             )
         
-        model_path = MODEL_DIR / "model.pkl"
+        model_path = MODEL_DIR / "knn_recommender.pkl"
         
         return {
             "status": "success",
@@ -161,17 +296,6 @@ def train_model():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.middleware("http")
-async def track_active_requests(request, call_next):
-    """
-    Middleware pour tracker le nombre de requêtes actives
-    """
-    active_requests.inc()  # Incrémenter au début de la requête
-    try:
-        response = await call_next(request)
-        return response
-    finally:
-        active_requests.dec()
 
 # Prediction endpoint
 @app.post("/predict", response_model=PredictionResponse)
@@ -180,27 +304,17 @@ def predict(request: PredictionRequest):
     Genere des recommandations de films pour un utilisateur
     """
     try:
+        # Vérifier que le modèle est chargé
+        if model is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Modèle non chargé. Utilisez /reload ou redémarrez l'API."
+            )
+        
         user_id = request.userId
         num_recommendations = request.numRecommendations
         
         print(f"Generation de {num_recommendations} recommandations pour l'utilisateur {user_id}...")
-        
-        # Verifier que le modele existe
-        model_path = MODEL_DIR / "model.pkl"
-        ids_path = MODEL_DIR / "movie_ids.pkl"
-        
-        if not model_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail="Modele non trouve. Executez /training d'abord."
-            )
-        
-        # Charger le modele
-        with open(model_path, 'rb') as f:
-            model = pickle.load(f)
-        
-        with open(ids_path, 'rb') as f:
-            movie_ids = pickle.load(f)
         
         # Charger user_matrix
         if not USER_MATRIX_PATH.exists():
