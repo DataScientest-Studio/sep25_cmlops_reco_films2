@@ -42,7 +42,7 @@ MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 load_dotenv()
 
 # Configuration JWT
-SECRET_KEY = "ta_cle_secrete_ici"  # Remplace par une clé sécurisée et stocke-la dans .env
+SECRET_KEY = "cle_secrete"  # Remplace par une clé sécurisée et stocke-la dans .env
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

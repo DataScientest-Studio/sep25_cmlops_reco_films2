@@ -8,12 +8,15 @@ import logging
 import os
 from functools import lru_cache
 
+from dotenv import load_dotenv
 import mlflow.pyfunc
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Header, status
 from pydantic import BaseModel
 
 import mlflow
+
+load_dotenv()
 
 # -----------------------------
 # CONFIGURATION
@@ -98,6 +101,34 @@ def load_model():
 
 
 # -----------------------------
+# Token control
+# -----------------------------
+
+def verify_service_token(authorization: str = Header(...)):
+    """
+    Vérifie le token envoyé dans l'en-tête Authorization.
+    Format attendu : "Bearer <token>"
+    """
+    expected_token = os.getenv("API_KNN_TOKEN")
+   
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header missing"
+        )
+    
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer" or parts[1] != expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+    
+    # Si ok, renvoie True (ou rien)
+    return True
+
+
+# -----------------------------
 # API ENDPOINTS
 # -----------------------------
 
@@ -120,7 +151,7 @@ def health():
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest):
+def predict(req: PredictRequest, token_ok: bool = Depends(verify_service_token)):
     """
     Prédit les notes SVD pour une liste de films et retourne un ranking.
     """

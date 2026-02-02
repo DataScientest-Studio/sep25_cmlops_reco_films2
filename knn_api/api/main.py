@@ -21,6 +21,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import datetime, timedelta
+import requests
 
 load_dotenv()
 
@@ -53,18 +54,18 @@ def get_connection():
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+FASTAPI_PREDICTION_URL = "http://movie_predicter_api:8000"
+
+
 # -----------------------------
 # AUTHENTICATION JWT + BCRYPT
 # -----------------------------
 
-SECRET_KEY = os.getenv("SECRET_KEY", "ta_cle_secrete_ici")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
 # Configuration JWT
-SECRET_KEY = "ta_cle_secrete_ici"  # Remplace par une clé sécurisée et stocke-la dans .env
+SECRET_KEY = "cle_secrete" 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+API_PREDICTER_TOKEN = os.getenv("API_PREDICTER_TOKEN")
 
 # Modèles Pydantic
 class Token(BaseModel):
@@ -186,6 +187,7 @@ class MovieRecommendation(BaseModel):
     genres: str
     avg_rating: float
     num_ratings: int
+    svg_pred_rate: float
 
 class PredictionResponse(BaseModel):
     userid: int
@@ -206,6 +208,23 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     userid: int
+
+
+def get_svd_movie_rate(token: str, userid: int, movieids: list[int] = []):
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {"userid": userid, "movieids": movieids}
+    
+    response = requests.post(
+        f"{FASTAPI_PREDICTION_URL}/predict",
+        headers=headers,
+        json=payload
+    )
+    
+    if response.status_code == 200:
+        return response.json()["recommendations"]
+    else:
+        return []
+    
 
 # -----------------------------
 # ENDPOINTS
@@ -245,8 +264,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer", "userid": get_random_userid()}
 
-@app.post("/training", response_model=TrainingResponse)
-def train_model():
+@app.post("/training", response_model=TrainingResponse,)
+def train_model(current_user: User = Depends(get_current_user)):
     try:
         if not TRAIN_SCRIPT.exists():
             raise HTTPException(status_code=404, detail=f"Script d'entrainement non trouve: {TRAIN_SCRIPT}")
@@ -268,7 +287,8 @@ async def track_active_requests(request, call_next):
         active_requests.dec()
 
 @app.post("/predict", response_model=PredictionResponse)
-def predict(request: PredictionRequest):
+def predict(request: PredictionRequest,
+            current_user: User = Depends(get_current_user)):
     try:
         user_id = request.userid
         num_recommendations = request.numRecommendations
@@ -300,29 +320,92 @@ def predict(request: PredictionRequest):
         watched_results = cursor.fetchall()
         watched_movies = set(row[0] for row in watched_results)
 
-        distances, indices = model.kneighbors([user_profile])
+        distances, indices = model.kneighbors([user_profile],n_neighbors=num_recommendations)
         recommended_movie_ids = movie_ids[indices[0]]
-        filtered_recommendations = [mid for mid in recommended_movie_ids if mid not in watched_movies][:num_recommendations]
+        print("----------BEFOOOOORE")
+        print("Watched movies:", len(watched_movies))
+        print("Unique KNN movies:", len(set(recommended_movie_ids)))
 
-        if not MOVIE_MATRIX_PATH.exists():
-            raise HTTPException(status_code=404, detail="movie_matrix.csv non trouve.")
-        movie_matrix = pd.read_csv(MOVIE_MATRIX_PATH)
-        recommendations = []
-        for movie_id in filtered_recommendations:
-            cursor.execute("SELECT title, genres FROM movies WHERE movieid = %s", (int(movie_id),))
-            movie_result = cursor.fetchone()
-            if movie_result:
-                title, genres = movie_result
-                movie_row = movie_matrix[movie_matrix['movieid'] == movie_id]
-                recommendations.append({
-                    "movieid": int(movie_id),
-                    "title": title,
-                    "genres": genres,
-                    "avg_rating": float(movie_row['avg_rating'].values[0]) if not movie_row.empty else 0.0,
-                    "num_ratings": int(movie_row['num_ratings'].values[0]) if not movie_row.empty else 0
-                })
-        cursor.close()
-        conn.close()
+        filtered_recommendations = [int(m) for m in recommended_movie_ids if m not in watched_movies]
+        print("Unseen movies after filter:", len(filtered_recommendations))
+        #Get svd predicted rates
+        headers = {"Authorization": f"Bearer {API_PREDICTER_TOKEN}"}
+        response = requests.post(
+            f"{FASTAPI_PREDICTION_URL}/predict",
+            headers=headers,
+            json={"userid": user_id, "movieids": filtered_recommendations}
+        )
+        if response.status_code == 200:
+            svd_predictions = response.json()
+            predicted_dict = {item['movieid']: item['predicted_rating'] for item in svd_predictions['ranked_movies']}
+            if not MOVIE_MATRIX_PATH.exists():
+                raise HTTPException(status_code=404, detail="movie_matrix.csv non trouve.")
+            movie_matrix = pd.read_csv(MOVIE_MATRIX_PATH)
+
+            all_candidates = []
+            for movie_id in filtered_recommendations:
+                cursor.execute("SELECT title, genres FROM movies WHERE movieid = %s", (int(movie_id),))
+                movie_result = cursor.fetchone()
+
+                if movie_result:
+                    title, genres = movie_result
+                    movie_row = movie_matrix[movie_matrix['movieid'] == movie_id]
+
+                    predicted_rating = float(predicted_dict.get(movie_id, 0.0))
+
+                    all_candidates.append({
+                        "movieid": int(movie_id),
+                        "title": title,
+                        "genres": genres,
+                        "avg_rating": float(movie_row['avg_rating'].values[0]) if not movie_row.empty else 0.0,
+                        "num_ratings": int(movie_row['num_ratings'].values[0]) if not movie_row.empty else 0,
+                        "svg_pred_rate": predicted_rating
+                    })
+
+            all_candidates = sorted(all_candidates, key=lambda x: x["svg_pred_rate"], reverse=True)
+            recommendations = []
+            # 1️⃣ Garder tous les films avec score >= 4
+            for movie in all_candidates:
+                if movie["svg_pred_rate"] >= 4.0:
+                    recommendations.append(movie)
+
+            # 2️⃣ Compléter si moins de 5
+            if len(recommendations) < 5:
+                for threshold in [3.5, 3.0, 2.0]:
+                    for movie in all_candidates:
+                        if movie["svg_pred_rate"] >= threshold and movie not in recommendations:
+                            recommendations.append(movie)
+                            if len(recommendations) >= 5:
+                                break
+                    if len(recommendations) >= 5:
+                        break
+            recommendations = sorted(recommendations, key=lambda x: x["svg_pred_rate"], reverse=True)
+
+            cursor.close()
+            conn.close()
+
+            return {"userid": user_id, "numRecommendations": len(recommendations), "recommendations": recommendations}
+        else:
+            if not MOVIE_MATRIX_PATH.exists():
+                raise HTTPException(status_code=404, detail="movie_matrix.csv non trouve.")
+            movie_matrix = pd.read_csv(MOVIE_MATRIX_PATH)
+            recommendations = []
+            for movie_id in filtered_recommendations:
+                cursor.execute("SELECT title, genres FROM movies WHERE movieid = %s", (int(movie_id),))
+                movie_result = cursor.fetchone()
+                if movie_result:
+                    title, genres = movie_result
+                    movie_row = movie_matrix[movie_matrix['movieid'] == movie_id]
+                    recommendations.append({
+                        "movieid": int(movie_id),
+                        "title": title,
+                        "genres": genres,
+                        "avg_rating": float(movie_row['avg_rating'].values[0]) if not movie_row.empty else 0.0,
+                        "num_ratings": int(movie_row['num_ratings'].values[0]) if not movie_row.empty else 0,
+                        "svg_pred_rate": 0
+                    })
+            cursor.close()
+            conn.close()
 
         return {"userid": user_id, "numRecommendations": len(recommendations), "recommendations": recommendations}
 
@@ -332,6 +415,7 @@ def predict(request: PredictionRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # -----------------------------
 # MAIN
