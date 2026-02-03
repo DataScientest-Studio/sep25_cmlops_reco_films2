@@ -322,7 +322,7 @@ def predict(request: PredictionRequest,
 
         distances, indices = model.kneighbors([user_profile],n_neighbors=num_recommendations)
         recommended_movie_ids = movie_ids[indices[0]]
-        print("----------BEFOOOOORE")
+        print("----------BEFORE")
         print("Watched movies:", len(watched_movies))
         print("Unique KNN movies:", len(set(recommended_movie_ids)))
 

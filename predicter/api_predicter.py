@@ -11,9 +11,10 @@ from functools import lru_cache
 from dotenv import load_dotenv
 import mlflow.pyfunc
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, Header, status
+from fastapi import Depends, FastAPI, HTTPException, Header, status, Security
 from pydantic import BaseModel
-
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.openapi.utils import get_openapi
 import mlflow
 
 load_dotenv()
@@ -52,6 +53,42 @@ app = FastAPI(
     description="API de prédiction utilisant le modèle MLflow en Production",
     version="1.0.0",
 )
+
+security = HTTPBearer()
+app.openapi_schema = None
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # 1️⃣ Declare le Bearer
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+    }
+
+    # 2️⃣ Lier le Bearer aux routes protégées
+    for path in openapi_schema["paths"].values():
+        for operation in path.values():
+            if "security" not in operation:
+                continue
+            # Si FastAPI a mis un security vide, on le remplace
+            operation["security"] = [{"BearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # -----------------------------
 # SCHEMAS
@@ -104,27 +141,17 @@ def load_model():
 # Token control
 # -----------------------------
 
-def verify_service_token(authorization: str = Header(...)):
-    """
-    Vérifie le token envoyé dans l'en-tête Authorization.
-    Format attendu : "Bearer <token>"
-    """
+def verify_service_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
     expected_token = os.getenv("API_KNN_TOKEN")
-   
-    if not authorization:
+
+    if credentials.credentials != expected_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header missing"
+            detail="Invalid token",
         )
-    
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer" or parts[1] != expected_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
-    
-    # Si ok, renvoie True (ou rien)
+
     return True
 
 
@@ -151,7 +178,9 @@ def health():
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest, token_ok: bool = Depends(verify_service_token)):
+def predict(req: PredictRequest,
+            token_ok: bool = Depends(verify_service_token),
+            _: HTTPAuthorizationCredentials = Security(security)):
     """
     Prédit les notes SVD pour une liste de films et retourne un ranking.
     """
@@ -193,7 +222,8 @@ def predict(req: PredictRequest, token_ok: bool = Depends(verify_service_token))
 
 
 @app.post("/reload-model")
-def reload_model():
+def reload_model(token_ok: bool = Depends(verify_service_token),
+                 _: HTTPAuthorizationCredentials = Security(security)):
     """
     Force le rechargement du modèle depuis MLflow (utile après une promotion).
     """
