@@ -12,7 +12,7 @@ import mlflow.pyfunc
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Security
 from pydantic import BaseModel
 from sqlalchemy import create_engine
 from surprise import SVD, Dataset, Reader, accuracy
@@ -25,9 +25,9 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-
+from fastapi.openapi.utils import get_openapi
 
 # -----------------------------
 # CONFIG
@@ -62,18 +62,6 @@ class User(BaseModel):
 class UserInDB(User):
     hashed_password: str
 
-# Utilisateurs fictifs (à remplacer par une base de données)
-fake_users_db = {
-    "admin": {
-        "username": "admin",
-        "hashed_password": "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # Mot de passe: "secret"
-        "disabled": False,
-    }
-}
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
@@ -92,6 +80,41 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 app = FastAPI(title="Training & Serving SVD Model API")
 
+security = HTTPBearer()
+app.openapi_schema = None
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    # 1️⃣ Declare le Bearer
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+    }
+
+    # 2️⃣ Lier le Bearer aux routes protégées
+    for path in openapi_schema["paths"].values():
+        for operation in path.values():
+            if "security" not in operation:
+                continue
+            # Si FastAPI a mis un security vide, on le remplace
+            operation["security"] = [{"BearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # -----------------------------
 # MODELS
@@ -335,7 +358,7 @@ def insert_data_chunk(conn, table_name, count):
 # API ENDPOINTS
 # -----------------------------
 @app.post("/training")
-def training():
+def training(_: HTTPAuthorizationCredentials = Security(security)):
     try:
         return train_svd_model()
     except Exception as e:
@@ -356,7 +379,8 @@ def health():
 
 
 @app.post("/insert-data")
-def insert_data(request: DataInsertRequest = Body(...)):
+def insert_data(request: DataInsertRequest = Body(...),
+                _: HTTPAuthorizationCredentials = Security(security)):
     """
     Insère un chunk de données dans les tables ratings, tags et genome_scores.
     Vérifie et met à jour daily_counts avant l'insertion.
@@ -402,7 +426,7 @@ def insert_data(request: DataInsertRequest = Body(...)):
 
 
 @app.get("/daily-counts")
-def get_daily_counts():
+def get_daily_counts(_: HTTPAuthorizationCredentials = Security(security)):
     """
     Récupère les informations de daily_counts.
     """
