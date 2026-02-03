@@ -56,11 +56,9 @@ def download_kaggle_posters():
     if os.path.exists(POSTER_DIR) and len(os.listdir(POSTER_DIR)) > 1000:
         return
 
-    st.info("📥 Téléchargement Kaggle des posters… (une seule fois)")
+    st.info("📥 Téléchargement Kaggle des posters… (Première connexion à l'appli)")
 
     dataset_path = kagglehub.dataset_download(DATASET_NAME)
-    st.write("Kaggle dataset path:", dataset_path)
-
     poster_source = find_poster_folder(dataset_path)
 
     if not poster_source:
