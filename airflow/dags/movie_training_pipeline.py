@@ -2,7 +2,8 @@ import logging
 from datetime import datetime, timedelta
 
 import requests
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
+
 
 from airflow import DAG
 
@@ -20,7 +21,7 @@ dag = DAG(
     "movie_training_pipeline",
     default_args=default_args,
     description="Pipeline de collecte et training",
-    schedule_interval="@daily",
+    schedule="@daily",
     catchup=False,
     tags=["ml", "movies"],
 )
