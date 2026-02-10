@@ -1,14 +1,24 @@
 import logging
+import os
 from datetime import datetime, timedelta
 
 import requests
 from airflow.providers.standard.operators.python import PythonOperator
-
-
 from airflow import DAG
 
 # Configuration
 TRAINER_API_URL = "http://movie_trainer_api:8000"
+
+# Récupérer le token depuis les variables d'environnement
+API_KNN_TOKEN = os.getenv("API_KNN_TOKEN")
+if not API_KNN_TOKEN:
+    raise ValueError("API_KNN_TOKEN n'est pas défini dans les variables d'environnement")
+
+# Headers pour l'authentification Bearer
+AUTH_HEADERS = {
+    "Authorization": f"Bearer {API_KNN_TOKEN}",
+    "Content-Type": "application/json"
+}
 
 default_args = {
     "owner": "airflow",
@@ -34,6 +44,7 @@ def insert_data():
     response = requests.post(
         f"{TRAINER_API_URL}/insert-data",
         json={"force_insert": False},  # force_insert à False par défaut
+        headers=AUTH_HEADERS,
         timeout=60,
     )
     response.raise_for_status()
@@ -62,6 +73,7 @@ def trigger_training():
     response = requests.post(
         f"{TRAINER_API_URL}/training",
         json={"model_type": "svd", "params": {"n_factors": 100, "n_epochs": 20}},
+        headers=AUTH_HEADERS,
         timeout=600,
     )
     response.raise_for_status()

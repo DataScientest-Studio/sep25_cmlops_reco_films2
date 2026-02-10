@@ -119,46 +119,43 @@ services:
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__FERNET_KEY: 8_EYDuReIm74yW2YANWItYyx7o92Sbgwe-c_Fj1tLu4=
     entrypoint: /bin/bash
     command: >
       -c "
-      airflow db migrate"
+      airflow db migrate || true
+      "
     restart: "no"
 
-  airflow-api:
+  airflow:
     build: ./airflow
-    container_name: airflow_api
+    container_name: airflow
     depends_on:
       airflow-init:
         condition: service_completed_successfully
     networks:
       - mlflow-net
+    env_file:
+      - ./airflow/.env
     environment:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+      AIRFLOW__CORE__FERNET_KEY: 8_EYDuReIm74yW2YANWItYyx7o92Sbgwe-c_Fj1tLu4=
+      AIRFLOW__API_AUTH__JWT_SECRET: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2
+      AIRFLOW__API__BASE_URL: http://localhost:8080
+      AIRFLOW__SDK__API_URL: http://localhost:8080
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
-    command: airflow api-server
+      - ./airflow/airflow.cfg:/opt/airflow/airflow.cfg
+    command: ["airflow", "standalone"]
     ports:
       - "8085:8080"
-
-  airflow-scheduler:
-    build: ./airflow
-    container_name: airflow_scheduler
-    depends_on:
-      - airflow-api
-    networks:
-      - mlflow-net
-    environment:
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - ./airflow/logs:/opt/airflow/logs
-    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/login/ || exit 1"]
+      interval: 20s
+      retries: 5
+      start_period: 30s
 
     
 volumes:

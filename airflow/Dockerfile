@@ -8,6 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+    
+RUN mkdir -p /opt/airflow/logs && \
+    chown -R airflow:root /opt/airflow/logs && \
+    chmod -R 777 /opt/airflow/logs
 
 USER airflow
 
