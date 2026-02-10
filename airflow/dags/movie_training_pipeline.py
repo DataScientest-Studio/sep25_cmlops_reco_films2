@@ -8,6 +8,7 @@ from airflow import DAG
 
 # Configuration
 TRAINER_API_URL = "http://movie_trainer_api:8000"
+FASTAPI_KNN_URL = "http://knn_api:8000"
 
 # Récupérer le token depuis les variables d'environnement
 API_KNN_TOKEN = os.getenv("API_KNN_TOKEN")
@@ -19,6 +20,10 @@ AUTH_HEADERS = {
     "Authorization": f"Bearer {API_KNN_TOKEN}",
     "Content-Type": "application/json"
 }
+
+# Credentials pour l'API KNN
+KNN_USERNAME = "admin"
+KNN_PASSWORD = "RecoFilm!2025"
 
 default_args = {
     "owner": "airflow",
@@ -67,8 +72,8 @@ def insert_data():
 
 
 def trigger_training():
-    """Déclenche le training du modèle"""
-    logging.info("🚀 Déclenchement du training...")
+    """Déclenche le training du modèle SVD"""
+    logging.info("🚀 Déclenchement du training SVD...")
 
     response = requests.post(
         f"{TRAINER_API_URL}/training",
@@ -79,7 +84,48 @@ def trigger_training():
     response.raise_for_status()
 
     result = response.json()
-    logging.info(f"✅ Training terminé : {result}")
+    logging.info(f"✅ Training SVD terminé : {result}")
+    return result
+
+
+def trigger_training_knn():
+    """Déclenche le training du modèle KNN"""
+    logging.info("🔐 Obtention du token pour l'API KNN...")
+    
+    # Obtenir le token
+    token_response = requests.post(
+        f"{FASTAPI_KNN_URL}/token",
+        data={"username": KNN_USERNAME, "password": KNN_PASSWORD},
+        timeout=30,
+    )
+    token_response.raise_for_status()
+    
+    token_data = token_response.json()
+    access_token = token_data.get("access_token")
+    
+    if not access_token:
+        raise ValueError("Token d'accès non reçu de l'API KNN")
+    
+    logging.info("✅ Token obtenu avec succès")
+    
+    # Headers avec le token
+    knn_headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
+    logging.info("🚀 Déclenchement du training KNN...")
+    
+    # Appeler l'endpoint de training
+    response = requests.post(
+        f"{FASTAPI_KNN_URL}/training",
+        headers=knn_headers,
+        timeout=600,
+    )
+    response.raise_for_status()
+    
+    result = response.json()
+    logging.info(f"✅ Training KNN terminé : {result}")
     return result
 
 
@@ -96,5 +142,12 @@ task_train = PythonOperator(
     dag=dag,
 )
 
+task_train_knn = PythonOperator(
+    task_id="trigger_training_knn",
+    python_callable=trigger_training_knn,
+    dag=dag,
+)
+
 # Ordre d'exécution
-task_insert >> task_train
+# Après insert_data, les deux trainings s'exécutent en parallèle
+task_insert >> [task_train, task_train_knn]
