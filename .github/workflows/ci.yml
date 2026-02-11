@@ -37,7 +37,7 @@ jobs:
 
       - name: Check import sorting with isort
         run: |
-          isort --check-only .
+          isort --check-only --profil black .
 
   test:
     runs-on: ubuntu-latest
