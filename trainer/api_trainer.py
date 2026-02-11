@@ -15,8 +15,12 @@ import psycopg2
 from dotenv import load_dotenv
 from fastapi import Body, Depends, FastAPI, HTTPException, Security, status
 from fastapi.openapi.utils import get_openapi
-from fastapi.security import (HTTPAuthorizationCredentials, HTTPBearer,
-                              OAuth2PasswordBearer, OAuth2PasswordRequestForm)
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+    OAuth2PasswordBearer,
+    OAuth2PasswordRequestForm,
+)
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
