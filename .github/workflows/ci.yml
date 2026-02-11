@@ -63,6 +63,7 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          API_BEARER_TOKEN: ${{ secrets.API_BEARER_TOKEN }}
         run: |
           pytest ./trainer/test/test_api_trainer.py -v --cov --cov-report=term-missing
 

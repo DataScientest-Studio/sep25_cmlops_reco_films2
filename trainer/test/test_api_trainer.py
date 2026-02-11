@@ -1,11 +1,13 @@
 # tests/test_api_trainer.py
 
 from unittest.mock import MagicMock
-
 import pytest
 from fastapi.testclient import TestClient
-
 from trainer import api_trainer as api  # Import corrigé pour ton arbo
+import os
+
+TOKEN = os.getenv("API_BEARER_TOKEN")
+headers = {"Authorization": f"Bearer {TOKEN}"}
 
 # -----------------------------
 # FASTAPI TEST CLIENT
@@ -71,7 +73,7 @@ def mock_db(monkeypatch):
 # TEST /training
 # -----------------------------
 def test_training_endpoint():
-    response = client.post("/training")
+    response = client.post("/training", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["rmse"] == 0.5
@@ -84,7 +86,7 @@ def test_training_endpoint():
 # TEST /insert-data
 # -----------------------------
 def test_insert_data_endpoint():
-    response = client.post("/insert-data", json={"force_insert": True})
+    response = client.post("/insert-data", json={"force_insert": True}, headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
@@ -97,7 +99,7 @@ def test_insert_data_endpoint():
 # TEST /daily-counts
 # -----------------------------
 def test_daily_counts_endpoint():
-    response = client.get("/daily-counts")
+    response = client.get("/daily-counts", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert "id" in data
