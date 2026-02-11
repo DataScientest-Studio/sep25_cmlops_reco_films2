@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import os
 import zipfile
-import kagglehub 
+import kagglehub
 import shutil
 from pathlib import Path
 
@@ -78,7 +78,6 @@ def download_kaggle_posters():
     st.success(f"🎬 Posters chargés !")
 
 
-
 def get_local_poster(movieid: int):
     """Récupère le poster localement ou fallback no_poster"""
     poster_path = os.path.join(POSTER_DIR, f"{movieid}.jpg")
@@ -91,9 +90,7 @@ def get_recommendations(token: str, userid: int, num_recommendations: int = 10):
     headers = {"Authorization": f"Bearer {token}"}
     payload = {"userid": userid, "numRecommendations": num_recommendations}
     response = requests.post(
-        f"{FASTAPI_KNN_URL}/predict",
-        headers=headers,
-        json=payload
+        f"{FASTAPI_KNN_URL}/predict", headers=headers, json=payload
     )
     if response.status_code == 200:
         return response.json()["recommendations"]
@@ -101,12 +98,24 @@ def get_recommendations(token: str, userid: int, num_recommendations: int = 10):
         st.error(f"Erreur API: {response.status_code} {response.text}")
         return []
 
+
 # -----------------------------
 # SESSION STATE INITIALIZATION
 # -----------------------------
-for key in ["token", "username", "userid", "recommendations", "index", "recommandations_ready"]:
+for key in [
+    "token",
+    "username",
+    "userid",
+    "recommendations",
+    "index",
+    "recommandations_ready",
+]:
     if key not in st.session_state:
-        st.session_state[key] = None if key in ["token","username"] else ([] if key=="recommendations" else 0)
+        st.session_state[key] = (
+            None
+            if key in ["token", "username"]
+            else ([] if key == "recommendations" else 0)
+        )
 
 
 # -----------------------------
@@ -115,12 +124,13 @@ for key in ["token", "username", "userid", "recommendations", "index", "recomman
 st.title("🔐 Recommandation de films")
 
 
-
 # -----------------------------
 # USER CONNECTED
 # -----------------------------
 if st.session_state.recommandations_ready and st.session_state.token:
-    st.success(f"Connecté en tant que {st.session_state.username} (UserId: {st.session_state.userid})")
+    st.success(
+        f"Connecté en tant que {st.session_state.username} (UserId: {st.session_state.userid})"
+    )
 
     recs = st.session_state.recommendations
     if recs:
@@ -151,12 +161,23 @@ if st.session_state.recommandations_ready and st.session_state.token:
                 st.markdown(f"Note moyenne: `{movie['avg_rating']:.2f}`")
                 st.markdown(f"Note prédite: `{movie['svg_pred_rate']:.2f}`")
 
-        st.caption(f"Page {start_idx // MOVIES_PER_PAGE + 1} / {(len(recs)-1)//MOVIES_PER_PAGE + 1}")
+        st.caption(
+            f"Page {start_idx // MOVIES_PER_PAGE + 1} / {(len(recs)-1)//MOVIES_PER_PAGE + 1}"
+        )
     else:
-        st.info("Aucune recommandation. Cliquez sur 'Get recommendations' pour charger les films.")
+        st.info(
+            "Aucune recommandation. Cliquez sur 'Get recommendations' pour charger les films."
+        )
 
     if st.button("Se déconnecter"):
-        for key in ["token", "username", "userid", "recommendations", "index", "recommandations_ready"]:
+        for key in [
+            "token",
+            "username",
+            "userid",
+            "recommendations",
+            "index",
+            "recommandations_ready",
+        ]:
             st.session_state[key] = None
         st.rerun()
 
@@ -172,12 +193,14 @@ else:
         submitted = st.form_submit_button("Se connecter")
 
         if submitted:
-            with st.spinner("Connexion en cours et récupération des recommandations..."):
+            with st.spinner(
+                "Connexion en cours et récupération des recommandations..."
+            ):
                 download_kaggle_posters()
                 # Login
                 response = requests.post(
                     f"{FASTAPI_KNN_URL}/token",
-                    data={"username": username, "password": password}
+                    data={"username": username, "password": password},
                 )
                 if response.status_code == 200:
                     token = response.json()["access_token"]

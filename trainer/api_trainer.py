@@ -25,7 +25,12 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+    OAuth2PasswordBearer,
+    OAuth2PasswordRequestForm,
+)
 from pydantic import BaseModel
 from fastapi.openapi.utils import get_openapi
 
@@ -46,18 +51,22 @@ SECRET_KEY = "cle_secrete"  # Remplace par une clé sécurisée et stocke-la dan
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+
 # Modèles Pydantic
 class Token(BaseModel):
     access_token: str
     token_type: str
     userid: int
 
+
 class TokenData(BaseModel):
     username: Optional[str] = None
+
 
 class User(BaseModel):
     username: str
     disabled: Optional[bool] = None
+
 
 class UserInDB(User):
     hashed_password: str
@@ -83,6 +92,7 @@ app = FastAPI(title="Training & Serving SVD Model API")
 security = HTTPBearer()
 app.openapi_schema = None
 
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -96,11 +106,7 @@ def custom_openapi():
 
     # 1️⃣ Declare le Bearer
     openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
+        "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
     }
 
     # 2️⃣ Lier le Bearer aux routes protégées
@@ -114,7 +120,9 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 app.openapi = custom_openapi
+
 
 # -----------------------------
 # MODELS
@@ -364,6 +372,7 @@ def training(_: HTTPAuthorizationCredentials = Security(security)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur entraînement : {e}")
 
+
 @app.get("/health")
 def health():
     """
@@ -379,8 +388,10 @@ def health():
 
 
 @app.post("/insert-data")
-def insert_data(request: DataInsertRequest = Body(...),
-                _: HTTPAuthorizationCredentials = Security(security)):
+def insert_data(
+    request: DataInsertRequest = Body(...),
+    _: HTTPAuthorizationCredentials = Security(security),
+):
     """
     Insère un chunk de données dans les tables ratings, tags et genome_scores.
     Vérifie et met à jour daily_counts avant l'insertion.

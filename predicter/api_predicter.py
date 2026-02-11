@@ -57,6 +57,7 @@ app = FastAPI(
 security = HTTPBearer()
 app.openapi_schema = None
 
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
@@ -70,11 +71,7 @@ def custom_openapi():
 
     # 1️⃣ Declare le Bearer
     openapi_schema["components"]["securitySchemes"] = {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT"
-        }
+        "BearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
     }
 
     # 2️⃣ Lier le Bearer aux routes protégées
@@ -87,6 +84,7 @@ def custom_openapi():
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
+
 
 app.openapi = custom_openapi
 
@@ -108,7 +106,6 @@ class MovieScore(BaseModel):
 class PredictResponse(BaseModel):
     userid: int
     ranked_movies: list[MovieScore]
-
 
 
 # -----------------------------
@@ -140,6 +137,7 @@ def load_model():
 # -----------------------------
 # Token control
 # -----------------------------
+
 
 def verify_service_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -178,9 +176,11 @@ def health():
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest,
-            token_ok: bool = Depends(verify_service_token),
-            _: HTTPAuthorizationCredentials = Security(security)):
+def predict(
+    req: PredictRequest,
+    token_ok: bool = Depends(verify_service_token),
+    _: HTTPAuthorizationCredentials = Security(security),
+):
     """
     Prédit les notes SVD pour une liste de films et retourne un ranking.
     """
@@ -191,10 +191,9 @@ def predict(req: PredictRequest,
             raise HTTPException(status_code=400, detail="movieids list is empty")
 
         # Construire le DataFrame batch
-        input_df = pd.DataFrame({
-            "userid": [req.userid] * len(req.movieids),
-            "movieid": req.movieids
-        })
+        input_df = pd.DataFrame(
+            {"userid": [req.userid] * len(req.movieids), "movieid": req.movieids}
+        )
 
         # Prédictions SVD
         predictions = model.predict(input_df)
@@ -202,28 +201,25 @@ def predict(req: PredictRequest,
         # Construire la réponse
         results = []
         for movie_id, score in zip(req.movieids, predictions):
-            results.append({
-                "movieid": int(movie_id),
-                "predicted_rating": round(float(score), 3)
-            })
+            results.append(
+                {"movieid": int(movie_id), "predicted_rating": round(float(score), 3)}
+            )
 
         # Trier par note décroissante
         results = sorted(results, key=lambda x: x["predicted_rating"], reverse=True)
 
-        return {
-            "userid": req.userid,
-            "ranked_movies": results
-        }
+        return {"userid": req.userid, "ranked_movies": results}
 
     except Exception as e:
         logger.exception("Erreur lors de la prédiction batch")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @app.post("/reload-model")
-def reload_model(token_ok: bool = Depends(verify_service_token),
-                 _: HTTPAuthorizationCredentials = Security(security)):
+def reload_model(
+    token_ok: bool = Depends(verify_service_token),
+    _: HTTPAuthorizationCredentials = Security(security),
+):
     """
     Force le rechargement du modèle depuis MLflow (utile après une promotion).
     """
