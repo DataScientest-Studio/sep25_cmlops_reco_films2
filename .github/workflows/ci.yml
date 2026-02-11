@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "projet-yms" ]
+    branches: [ "projet-ym", "mergeProject" ]
   pull_request:
-    branches: [ "projet-yms" ]
+    branches: [ "projet-yms", "mergeProject" ]
 
 jobs:
   lint:
