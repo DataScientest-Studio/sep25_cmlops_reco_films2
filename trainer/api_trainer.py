@@ -5,34 +5,28 @@ API FastAPI pour entraîner et servir un modèle de recommandation SVD via MLflo
 
 import logging
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 import mlflow.pyfunc
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, HTTPException, Security
+from fastapi import Body, Depends, FastAPI, HTTPException, Security, status
+from fastapi.openapi.utils import get_openapi
+from fastapi.security import (HTTPAuthorizationCredentials, HTTPBearer,
+                              OAuth2PasswordBearer, OAuth2PasswordRequestForm)
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy import create_engine
 from surprise import SVD, Dataset, Reader, accuracy
 from surprise.model_selection import train_test_split
+
 import mlflow
 from mlflow import MlflowClient
 from shared.svd_wrapper import SurpriseSVDWrapper
-from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import (
-    HTTPAuthorizationCredentials,
-    HTTPBearer,
-    OAuth2PasswordBearer,
-    OAuth2PasswordRequestForm,
-)
-from pydantic import BaseModel
-from fastapi.openapi.utils import get_openapi
 
 # -----------------------------
 # CONFIG

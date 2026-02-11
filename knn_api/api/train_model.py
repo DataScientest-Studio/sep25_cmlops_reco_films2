@@ -2,16 +2,18 @@
 Script d'entrainement du modele de recommandation (KNN) avec MLflow + Model Registry (Aliases)
 """
 
-import pandas as pd
+import os
 import pickle
-from pathlib import Path
-from sklearn.neighbors import NearestNeighbors
-import mlflow
-import mlflow.sklearn
-from mlflow.tracking import MlflowClient
 import time
 from datetime import datetime
-import os
+from pathlib import Path
+
+import mlflow.sklearn
+import pandas as pd
+from mlflow.tracking import MlflowClient
+from sklearn.neighbors import NearestNeighbors
+
+import mlflow
 
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 

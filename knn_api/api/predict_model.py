@@ -2,13 +2,15 @@
 Script de prediction pour generer des recommandations de films
 """
 
-from mlflow import MlflowClient
-import mlflow
-import pandas as pd
-import numpy as np
 import pickle
 import sqlite3
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+import mlflow
+from mlflow import MlflowClient
 
 
 def load_model(model_dir):

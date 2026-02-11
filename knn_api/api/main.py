@@ -3,26 +3,28 @@ API FastAPI pour le systeme de recommandation de films
 Version PostgreSQL (Supabase)
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
-import mlflow
-from pydantic import BaseModel
-from typing import List, Optional
-from prometheus_fastapi_instrumentator import Instrumentator
-import pandas as pd
-import pickle
-import subprocess
-from pathlib import Path
-import sys
-from prometheus_client import Gauge, REGISTRY
 import os
+import pickle
 import socket
-from dotenv import load_dotenv
+import subprocess
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Optional
+
+import pandas as pd
 import psycopg2
+import requests
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from datetime import datetime, timedelta
-import requests
+from prometheus_client import REGISTRY, Gauge
+from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel
+
+import mlflow
 
 load_dotenv()
 

@@ -3,24 +3,21 @@ Script de réentraînement automatique basé sur la détection de drift
 Lance un réentraînement si le drift dépasse un seuil défini
 """
 
-import sys
-import subprocess
-from pathlib import Path
-from datetime import datetime
 import json
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
 
 # Ajouter les chemins nécessaires
 sys.path.append(str(Path(__file__).parent.parent.parent / "database"))
 sys.path.append(str(Path(__file__).parent))
 
-from drift_detection import (
-    load_reference_data,
-    load_current_data_from_supabase,
-    reconstruct_movie_matrix,
-    reconstruct_user_matrix,
-)
-from evidently.report import Report
+from drift_detection import (load_current_data_from_supabase,
+                             load_reference_data, reconstruct_movie_matrix,
+                             reconstruct_user_matrix)
 from evidently.metric_preset import DataDriftPreset
+from evidently.report import Report
 
 
 def calculate_drift_score(reference_data, current_data):

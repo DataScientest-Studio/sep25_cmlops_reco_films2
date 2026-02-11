@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import requests
 from airflow.providers.standard.operators.python import PythonOperator
+
 from airflow import DAG
 
 # Configuration

@@ -1,10 +1,11 @@
-import streamlit as st
-import requests
 import os
-import zipfile
-import kagglehub
 import shutil
+import zipfile
 from pathlib import Path
+
+import kagglehub
+import requests
+import streamlit as st
 
 # -----------------------------
 # CONFIGURATION
@@ -20,22 +21,24 @@ POSTER_DIR = "poster_movie"
 NO_POSTER = "poster_movie/no_poster.png"
 
 
-# -----------------------------
-# FONCTIONS
-# -----------------------------
-import kagglehub
 import os
 import shutil
 import time
 from pathlib import Path
+
+# -----------------------------
+# FONCTIONS
+# -----------------------------
+import kagglehub
 import streamlit as st
 
 DATASET_NAME = "ghrzarea/movielens-20m-posters-for-machine-learning"
 POSTER_DIR = "poster_movie"
 
-import kagglehub
 import os
 import shutil
+
+import kagglehub
 import streamlit as st
 
 DATASET_NAME = "ghrzarea/movielens-20m-posters-for-machine-learning"

@@ -3,12 +3,13 @@ Script de détection de data drift avec Evidently
 Compare les données de référence (CSV) avec les données courantes (Supabase)
 """
 
-import pandas as pd
 import sys
-from pathlib import Path
-from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset, DataQualityPreset
 from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+from evidently.metric_preset import DataDriftPreset, DataQualityPreset
+from evidently.report import Report
 
 # Ajouter le chemin pour importer config
 sys.path.append(str(Path(__file__).parent.parent.parent / "database"))

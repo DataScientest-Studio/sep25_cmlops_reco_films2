@@ -8,13 +8,14 @@ import logging
 import os
 from functools import lru_cache
 
-from dotenv import load_dotenv
 import mlflow.pyfunc
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, Header, status, Security
-from pydantic import BaseModel
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Header, HTTPException, Security, status
 from fastapi.openapi.utils import get_openapi
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
+
 import mlflow
 
 load_dotenv()

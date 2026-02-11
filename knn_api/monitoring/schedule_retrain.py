@@ -3,12 +3,13 @@ Script pour planifier l'exécution automatique du réentraînement
 Utilise APScheduler pour simuler un cron job
 """
 
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.cron import CronTrigger
 import subprocess
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 
 def run_auto_retrain():
