@@ -141,25 +141,42 @@ jobs:
         run: |
           docker compose down -v
 
-  deploy-dockerhub:
-    runs-on: ubuntu-latest
-    needs: docker-integration-test
+deploy-dockerhub:
+  runs-on: ubuntu-latest
+  needs: docker-integration-test
 
-    steps:
-      - uses: actions/checkout@v4
+  steps:
+    - uses: actions/checkout@v4
 
-      - name: Login to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+    - name: Login to Docker Hub
+      run: |
+        echo "${{ secrets.DOCKER}}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      - name: Build release image
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-app:$IMAGE_TAG .
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/movie-app:$IMAGE_TAG ${{ secrets.DOCKERHUB_USERNAME }}/movie-app:latest
+    - name: Build & Push all images
+      run: |
+        IMAGE_TAG=${{ github.sha }}
 
-      - name: Push image to Docker Hub
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-app:$IMAGE_TAG
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-app:latest
+        # MLflow
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-mlflow:$IMAGE_TAG -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-mlflow:latest ./mlflow
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-mlflow:$IMAGE_TAG
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-mlflow:latest
+
+        # Trainer API
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-trainer:$IMAGE_TAG -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-trainer:latest ./trainer
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-trainer:$IMAGE_TAG
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-trainer:latest
+
+        # Predicter API
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-predicter:$IMAGE_TAG -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-predicter:latest ./predicter
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-predicter:$IMAGE_TAG
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-predicter:latest
+
+        # KNN API
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-knn:$IMAGE_TAG -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-knn:latest ./knn_api
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-knn:$IMAGE_TAG
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-knn:latest
+
+        # Streamlit UI
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-ui:$IMAGE_TAG -t ${{ secrets.DOCKERHUB_USERNAME }}/movie-ui:latest ./streamlit-ui
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-ui:$IMAGE_TAG
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/movie-ui:latest
