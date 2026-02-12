@@ -1,10 +1,12 @@
 # tests/test_api_trainer.py
 
+import os
 from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
+
 from trainer import api_trainer as api  # Import corrigé pour ton arbo
-import os
 
 TOKEN = os.getenv("API_BEARER_TOKEN")
 headers = {"Authorization": f"Bearer {TOKEN}"}
