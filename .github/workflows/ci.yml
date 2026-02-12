@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ "projet-ym", "mergeProject" ]
+    branches: [ "projet-yms", "mergeProject" ]
   pull_request:
     branches: [ "projet-yms", "mergeProject" ]
 
@@ -26,9 +26,7 @@ jobs:
 
       - name: Lint with flake8
         run: |
-          # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Exit-zero treats all errors as warnings
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Check code formatting with black
@@ -37,7 +35,7 @@ jobs:
 
       - name: Check import sorting with isort
         run: |
-          isort --check-only --profil black .
+          isort --check-only --profile black .
 
   test:
     runs-on: ubuntu-latest
@@ -81,6 +79,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 🔧 Libère 20–30 GB pour éviter "no space left on device"
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/lib/android
+          docker system prune -af || true
+          docker builder prune -af || true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -101,7 +108,6 @@ jobs:
       - name: Wait for services to be ready
         run: |
           sleep 10
-          # Afficher les logs en temps réel pendant 30 secondes
           timeout 30s docker compose logs -f || true
 
       - name: Check container status
@@ -119,8 +125,6 @@ jobs:
           echo ""
           echo "=== MLflow logs ==="
           docker compose logs movie_mlflow || echo "No mlflow logs"
-          
-          
 
       - name: Test services are responding
         run: |
