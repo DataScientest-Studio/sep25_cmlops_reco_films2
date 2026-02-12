@@ -1,222 +1,1194 @@
 import os
-import shutil
-import zipfile
+import textwrap
 from pathlib import Path
 
-import kagglehub
-import requests
 import streamlit as st
 
-# -----------------------------
-# CONFIGURATION
-# -----------------------------
-FASTAPI_TRAINING_URL = "http://movie_trainer_api:8000"
-FASTAPI_PREDICTION_URL = "http://movie_predicter_api:8000"
-FASTAPI_KNN_URL = "http://knn_api:8000"
-DEFAULT_RECO = 100  # Nombre par défaut de recommandations
-MOVIES_PER_PAGE = 5  # Nombre de films par page
+from demo import demo
+from sprint34 import afficher_slide3_4
 
-DATASET_NAME = "ghrzarea/movielens-20m-posters-for-machine-learning"
-POSTER_DIR = "poster_movie"
-NO_POSTER = "poster_movie/no_poster.png"
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 
 
-import os
-import shutil
-import time
-from pathlib import Path
-
-# -----------------------------
-# FONCTIONS
-# -----------------------------
-import kagglehub
-import streamlit as st
-
-DATASET_NAME = "ghrzarea/movielens-20m-posters-for-machine-learning"
-POSTER_DIR = "poster_movie"
-
-import os
-import shutil
-
-import kagglehub
-import streamlit as st
-
-DATASET_NAME = "ghrzarea/movielens-20m-posters-for-machine-learning"
-POSTER_DIR = "poster_movie"
+def asset(filename: str) -> str:
+    # Retourner le chemin absolu d'un fichier dans le dossier assets.
+    return str(ASSETS_DIR / filename)
 
 
-def find_poster_folder(root):
-    for dirpath, dirnames, filenames in os.walk(root):
-        jpgs = [f for f in filenames if f.lower().endswith(".jpg")]
-        if len(jpgs) > 1000:  # dossier qui contient les images
-            return dirpath
-    return None
+# ============================================================
+# 1) Page config
+# ============================================================
+st.set_page_config(
+    page_title="RecoFilm",
+    page_icon="🎬",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ============================================================
+# 2) Global CSS (same style for all pages)
+# ============================================================
+st.markdown(
+    """
+<style>
+/* Global spacing */
+.block-container { padding-top: 1.2rem; padding-bottom: 2.2rem; max-width: 1400px; }
+[data-testid="stSidebar"] { padding-top: 1.2rem; }
+
+/* Typography */
+h1, h2, h3 { letter-spacing: -0.2px; }
+.subtitle { color:#6b7280; font-size:0.95rem; margin-top:-6px; }
+
+/* Cards */
+.card {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-radius: 18px;
+  padding: 18px 18px 14px 18px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.card h3 { margin: 0 0 .35rem 0; font-size: 1.05rem; }
+.muted { color: #6b7280; font-size: 0.92rem; }
+
+/* Metric cards row */
+.metric-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:stretch;
+  margin-top:6px;
+  margin-bottom:10px;
+}
+.mcard{
+  flex: 1 1 160px;
+  min-width: 160px;
+  background:#ffffff;
+  border:1px solid #ececec;
+  border-radius:16px;
+  padding:12px 14px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.mhead{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  font-weight:800;
+  color:#111827;
+  font-size:0.9rem;
+}
+.micon{ font-size:1.05rem; }
+.mval{
+  font-size:1.4rem;
+  font-weight:900;
+  color:#111827;
+  margin-top:6px;
+  line-height:1.15;
+}
+
+/* Status bar */
+.status-ok{
+  background:#eafff1;
+  border:1px solid #c8f3d9;
+  color:#0f5132;
+  border-radius:14px;
+  padding:10px 12px;
+  font-weight:800;
+}
+.status-wip{
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  color:#7c2d12;
+  border-radius:14px;
+  padding:10px 12px;
+  font-weight:800;
+}
+
+/* Tabs header hint */
+.tab-hint{ color:#6b7280; font-size:0.9rem; margin-top:-6px; }
+
+/* Capture placeholders */
+.capture-box{
+  border: 2px dashed #bdbdbd;
+  border-radius: 14px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #111827;
+  font-size: 0.95rem;
+  text-align:center;
+  padding: 10px;
+}
+
+/* Roadmap boxes */
+.phase-box {
+  border-radius: 16px;
+  border: 0;
+  padding: 12px 14px;
+  height: 72px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-weight: 900;
+  color: #ffffff;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+}
+.arrow {
+  height: 72px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 1.8rem;
+  color:#A3A3A3;
+  font-weight: 900;
+}
+
+/* Simple list pills */
+.pill{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  font-weight:700;
+  font-size:0.85rem;
+  margin-right:8px;
+  margin-bottom:8px;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+# ============================================================
+# 3) Sidebar navigation
+# ============================================================
+st.sidebar.title("RecoFilm")
+st.sidebar.markdown("### Présentation")
+
+PAGES = [
+    ("intro", "Introduction: Objectif & roadmap"),
+    ("p1", "1 — Fondations: Data, DB, API"),
+    ("p2", "2 — Suivi & Versionning: MLflows"),
+    ("p3", "3 — Orchestration & Déploiement"),
+    ("p4", "4 — Monitoring & Maintenance"),
+    ("p5", "5 — Frontend"),
+]
+PAGE_LABEL = {k: v for k, v in PAGES}
+
+page_key = st.sidebar.radio(
+    label="",
+    options=[k for k, _ in PAGES],
+    format_func=lambda k: PAGE_LABEL[k],
+    index=0,
+)
 
 
-def download_kaggle_posters():
-    print(os.path.exists(POSTER_DIR))
-    print(len(os.listdir(POSTER_DIR)))
-    if os.path.exists(POSTER_DIR) and len(os.listdir(POSTER_DIR)) > 1000:
-        return
-
-    st.info("📥 Téléchargement Kaggle des posters… (Première connexion à l'appli)")
-
-    dataset_path = kagglehub.dataset_download(DATASET_NAME)
-    poster_source = find_poster_folder(dataset_path)
-
-    if not poster_source:
-        raise RuntimeError("Impossible de localiser les posters dans le dataset")
-
-    os.makedirs(POSTER_DIR, exist_ok=True)
-
-    copied = 0
-    for file in os.listdir(poster_source):
-        if file.endswith(".jpg"):
-            src = os.path.join(poster_source, file)
-            dst = os.path.join(POSTER_DIR, file)
-            if not os.path.exists(dst):
-                shutil.copy(src, dst)
-                copied += 1
-
-    st.success(f"🎬 Posters chargés !")
+# ============================================================
+# 4) UI Components
+# ============================================================
+def metric_cards(items):
+    """
+    items: list of dicts
+    {"icon":"🎬", "label":"Films", "value":"27,278"}
+    IMPORTANT: no leading indentation to avoid Markdown code block rendering.
+    """
+    parts = ['<div class="metric-row">']
+    for it in items:
+        parts.append(
+            f'<div class="mcard">'
+            f'  <div class="mhead"><span class="micon">{it["icon"]}</span><span>{it["label"]}</span></div>'
+            f'  <div class="mval">{it["value"]}</div>'
+            f"</div>"
+        )
+    parts.append("</div>")
+    st.markdown("\n".join(parts), unsafe_allow_html=True)
 
 
-def get_local_poster(movieid: int):
-    """Récupère le poster localement ou fallback no_poster"""
-    poster_path = os.path.join(POSTER_DIR, f"{movieid}.jpg")
-    if os.path.exists(poster_path):
-        return poster_path
-    return NO_POSTER
-
-
-def get_recommendations(token: str, userid: int, num_recommendations: int = 10):
-    headers = {"Authorization": f"Bearer {token}"}
-    payload = {"userid": userid, "numRecommendations": num_recommendations}
-    response = requests.post(
-        f"{FASTAPI_KNN_URL}/predict", headers=headers, json=payload
-    )
-    if response.status_code == 200:
-        return response.json()["recommendations"]
+def show_image_or_placeholder(filename: str, caption: str, height: int = 360):
+    # Afficher l'image si elle existe, sinon placeholder.
+    img_path = ASSETS_DIR / filename
+    if img_path.exists():
+        st.image(asset(filename), use_container_width=True, caption=caption)
     else:
-        st.error(f"Erreur API: {response.status_code} {response.text}")
-        return []
-
-
-# -----------------------------
-# SESSION STATE INITIALIZATION
-# -----------------------------
-for key in [
-    "token",
-    "username",
-    "userid",
-    "recommendations",
-    "index",
-    "recommandations_ready",
-]:
-    if key not in st.session_state:
-        st.session_state[key] = (
-            None
-            if key in ["token", "username"]
-            else ([] if key == "recommendations" else 0)
+        capture_placeholder(
+            f"📌 Image à ajouter : <b>{caption}</b><br><span class='muted'>Fichier : {filename}</span>",
+            height=height,
         )
 
 
-# -----------------------------
-# TITLE
-# -----------------------------
-st.title("🔐 Recommandation de films")
+def status_ok(text):
+    st.markdown(f'<div class="status-ok">✅ {text}</div>', unsafe_allow_html=True)
 
 
-# -----------------------------
-# USER CONNECTED
-# -----------------------------
-if st.session_state.recommandations_ready and st.session_state.token:
-    st.success(
-        f"Connecté en tant que {st.session_state.username} (UserId: {st.session_state.userid})"
+def status_wip(text):
+    st.markdown(f'<div class="status-wip">🟠 {text}</div>', unsafe_allow_html=True)
+
+
+def capture_placeholder(label, height=220):
+    st.markdown(
+        f'<div class="capture-box" style="height:{height}px;">{label}</div>',
+        unsafe_allow_html=True,
     )
 
-    recs = st.session_state.recommendations
-    if recs:
-        start_idx = st.session_state.index
-        end_idx = start_idx + MOVIES_PER_PAGE
-        page = recs[start_idx:end_idx]
 
-        # Boutons Prev / Next
-        col1, col2, col3 = st.columns([1, 3, 1])
-        with col1:
-            if st.button("⬅️ Prev"):
-                st.session_state.index = (start_idx - MOVIES_PER_PAGE) % len(recs)
-                st.rerun()
-        with col3:
-            if st.button("Next ➡️"):
-                st.session_state.index = (start_idx + MOVIES_PER_PAGE) % len(recs)
-                st.rerun()
+def roadmap_boxes():
+    st.markdown("#### Roadmap")
+    cols = st.columns([2.2, 0.6, 2.2, 0.6, 2.2, 0.6, 2.2, 0.6, 2.2], gap="small")
 
-        # Affichage horizontal
-        movie_cols = st.columns(MOVIES_PER_PAGE)
-        for idx, movie in enumerate(page):
-            poster_path = get_local_poster(movie["movieid"])
-            with movie_cols[idx]:
-                st.caption(f"Movie ID: {movie['movieid']}")
-                st.image(poster_path, width=150)
-                st.markdown(f"**{movie['title']}**")
-                st.markdown(f"Genres: {movie['genres']}")
-                st.markdown(f"Note moyenne: `{movie['avg_rating']:.2f}`")
-                st.markdown(f"Note prédite: `{movie['svg_pred_rate']:.2f}`")
+    phases = [
+        (
+            "Phase 1<br>Fondations",
+            "Données + DB + baseline + API (/training, /predict)",
+            "#A78BFA",
+        ),
+        (
+            "Phase 2<br>Microservices & Suivi",
+            "MLflow: runs + comparaison + Registry (versions & stages)",
+            "#6366F1",
+        ),
+        (
+            "Phase 3<br>Orchestration & Déploiement",
+            "Docker / CI-CD + tests + build & publication",
+            "#A78BFA",
+        ),
+        (
+            "Phase 4<br>Monitoring",
+            "Grafana + Evidently (drift) + politique de retrain",
+            "#6366F1",
+        ),
+        ("Phase 5<br>Frontend", "Streamlit: démo user_id → recommandations", "#A78BFA"),
+    ]
 
-        st.caption(
-            f"Page {start_idx // MOVIES_PER_PAGE + 1} / {(len(recs)-1)//MOVIES_PER_PAGE + 1}"
+    box_positions = [0, 2, 4, 6, 8]
+    arrow_positions = [1, 3, 5, 7]
+
+    for i, pos in enumerate(box_positions):
+        title_html, _, color = phases[i]
+        with cols[pos]:
+            st.markdown(
+                f"<div class='phase-box' style='background:{color};'>{title_html}</div>",
+                unsafe_allow_html=True,
+            )
+
+    for pos in arrow_positions:
+        with cols[pos]:
+            st.markdown("<div class='arrow'>→</div>", unsafe_allow_html=True)
+
+    desc_cols = st.columns([2.2, 0.6, 2.2, 0.6, 2.2, 0.6, 2.2, 0.6, 2.2], gap="small")
+    for i, pos in enumerate(box_positions):
+        _, desc, _ = phases[i]
+        with desc_cols[pos]:
+            st.markdown(desc)
+
+
+def placeholder_page(title: str, subtitle: str):
+    st.markdown(f"## {title}")
+    st.markdown(f"<div class='subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+    st.write("")
+    st.info(
+        "Page prête (template). Remplir avec : preuves (captures), liens, résultats, et 3 messages clés."
+    )
+
+
+# ============================================================
+# 5) Pages - intro
+# ============================================================
+def render_intro():
+    st.markdown("## RECOFILM")
+    st.markdown(
+        "<div class='subtitle'>Système de Recommandation de Films — Architecture MLOps (5 sprints)</div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
+
+    # --- (1) Un seul grand bloc pleine largeur : Équipe / Contexte / Repo / Stackholders ---
+    st.markdown(
+        """
+<div class="card">
+  <h3>Équipe</h3>
+  <div style="margin-top:10px; line-height:1.55;">
+    Jimmy Seyer / Yacine Madi Said / Jingzi Zhao / Monitoring : Nicolas
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <h3>Contexte</h3>
+  <div style="margin-top:10px; line-height:1.55;">
+    Dans le cadre de la formation DataScientest, notre projet de module MLOps est de développer un système de recommandation de films type « Netflix ». Lorsqu’un utilisateur saisit son identifiant, le système s’appuie sur les notes existantes et les informations de contenu pour générer une liste de recommandations « que vous pourriez aussi aimer ».
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <h3>Repo</h3>
+  <div style="margin-top:10px; line-height:1.55;">
+    DataScientest-Studio/sep25_cmlops_reco_films2
+  </div>
+
+  <div style="height:14px;"></div>
+
+  <h3>Stackholders</h3>
+  <div style="margin-top:10px; line-height:1.55;">
+    <li><b>Sponsor (simulation)</b> : une plateforme/entreprise du secteur cinéma.</li>
+    <li><b>Utilisateur</b> : saisit son identifiant (ex. <code>user_id</code>) et le système renvoie une liste de films recommandés (Top-N).</li>
+    <li><b>Admin/Ops</b> : déclenche la mise à jour du modèle lors des rafraîchissements de données ou en cas de baisse de performance ; surveille la dérive (drift) et la qualité des recommandations.</li>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.write("")
+
+    # --- (2) Objectifs + Utilisation + Architecture + Roadmap dans des tabs ---
+    tabs = st.tabs(["🎯 Objectifs", "🧭 Utilisation", "🏗️ Architecture", "🗺️ Roadmap"])
+
+    with tabs[0]:
+        objectifs_html = """
+<div class="card">
+<h3>Objectifs</h3>
+
+<div style="margin-top:10px; line-height:1.65;">
+<ol style="margin:0; padding-left: 18px;">
+<li style="margin-bottom:10px;">
+<b>Démo Streamlit — Recommandation de films</b>
+<ul style="margin-top:6px;">
+<li>L’utilisateur saisit son <code>user_id</code> et reçoit une liste <b>Top-N</b> de films recommandés.</li>
+<li>La recommandation combine deux logiques :
+<ul style="margin-top:6px;">
+<li><b>Filtrage collaboratif</b></li>
+<li><b>Content-based</b></li>
+</ul>
+</li>
+</ul>
+</li>
+
+<li style="margin-bottom:10px;">
+<b>3 questions métier à couvrir</b>
+<ul style="margin-top:6px;">
+<li><b>Cold Start</b> : proposer des recommandations pour un nouvel utilisateur ou un nouveau film.</li>
+<li><b>Monitoring</b> : suivre des indicateurs pour savoir si la recommandation s’améliore ou se dégrade.</li>
+<li><b>Data Drift</b> : détecter une dérive des données et déclencher une mise à jour du modèle.</li>
+</ul>
+</li>
+
+<li>
+<b>Mise en place des composants MLOps</b>
+<ul style="margin-top:6px;">
+<li>Stockage des données (PostgreSQL).</li>
+<li>Séparation claire des scripts <code>train</code> et <code>predict</code>.</li>
+<li>API pour l’entraînement et l’inférence.</li>
+<li>MLflow : suivi d’expériences et gestion des versions.</li>
+<li>Déploiement : Docker, drift detection, stratégie de maintenance.</li>
+</ul>
+</li>
+</ol>
+</div>
+</div>
+"""
+        st.markdown(objectifs_html, unsafe_allow_html=True)
+
+    with tabs[1]:
+        # mets ton image ici (ex: assets/intro_utilisation.png)
+        show_image_or_placeholder(
+            filename="intro_utilisation.png",
+            caption="Utilisation de l'application (démo RecoFilm)",
+            height=440,
         )
-    else:
-        st.info(
-            "Aucune recommandation. Cliquez sur 'Get recommendations' pour charger les films."
+
+    with tabs[2]:
+        # mets ton image ici (ex: assets/intro_architecture.png)
+        show_image_or_placeholder(
+            filename="intro_architecture.png",
+            caption="Architecture (services & flux)",
+            height=440,
         )
 
-    if st.button("Se déconnecter"):
-        for key in [
-            "token",
-            "username",
-            "userid",
-            "recommendations",
-            "index",
-            "recommandations_ready",
-        ]:
-            st.session_state[key] = None
-        st.rerun()
+    with tabs[3]:
+        # mets ton image ici (ex: assets/intro_roadmap.png)
+        show_image_or_placeholder(
+            filename="intro_roadmap.png",
+            caption="Roadmap (5 phases)",
+            height=440,
+        )
 
 
-# -----------------------------
-# USER NOT CONNECTED
-# -----------------------------
-else:
-    st.warning("Veuillez vous connecter pour accéder aux recommandations.")
-    with st.form("login_form"):
-        username = st.text_input("Nom d'utilisateur", value="admin")
-        password = st.text_input("Mot de passe", type="password", value="RecoFilm!2025")
-        submitted = st.form_submit_button("Se connecter")
+# ============================================================
+# 6) Pages - Phase 1  Fondations
+# ============================================================
+def render_phase1():
+    st.markdown("## Phase 1 — Fondations")
+    st.markdown(
+        "<div class='subtitle'>Deadline : 3 Novembre 2025</div>", unsafe_allow_html=True
+    )
+    st.write("")
 
-        if submitted:
-            with st.spinner(
-                "Connexion en cours et récupération des recommandations..."
-            ):
-                download_kaggle_posters()
-                # Login
-                response = requests.post(
-                    f"{FASTAPI_KNN_URL}/token",
-                    data={"username": username, "password": password},
-                )
-                if response.status_code == 200:
-                    token = response.json()["access_token"]
-                    userid = response.json()["userid"]
-                    recommendations = get_recommendations(token, userid, DEFAULT_RECO)
+    # Top metrics
+    metric_cards(
+        [
+            {"icon": "🎬", "label": "Films", "value": "14026"},
+            {"icon": "👥", "label": "Utilisateurs", "value": "7120"},
+            {"icon": "⭐", "label": "Ratings", "value": "10M"},
+            {"icon": "🗄️", "label": "DB", "value": "PostgreSQL"},
+            {"icon": "🤖", "label": "Modèle", "value": "KNN"},
+            {"icon": "📜", "label": "Scripts", "value": "training + predict"},
+        ]
+    )
 
-                    st.session_state.token = token
-                    st.session_state.username = username
-                    st.session_state.userid = userid
-                    st.session_state.recommandations_ready = True
-                    st.session_state.recommendations = recommendations
-                    st.session_state.index = 0
-                    st.success("Connexion réussie ! Recommandations chargées ✅")
-                    st.rerun()
-                else:
-                    st.error("Nom d'utilisateur ou mot de passe incorrect.")
+    status_ok("Phase 1 livrée : data + DB + baseline ML + API opérationnelle")
+    st.write("")
+
+    tabs = st.tabs(
+        [
+            "🎯 Objectifs & Livrables",
+            "🧹 Données",
+            "🗄️ DB",
+            "🤖 Modèle",
+            "🧩 API",
+            "📜 Scripts",
+            "🧯 Défis",
+        ]
+    )
+
+    with tabs[0]:
+        left, right = st.columns([0.55, 0.45], gap="large")
+        with left:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Objectifs (Sprint 1)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Définir une roadmap et poser l’architecture</li>
+    <li>Environnement reproductible (venv + requirements)</li>
+    <li>Collecte + prétraitement des données</li>
+    <li>Créer une DB et la remplir (script one-shot)</li>
+    <li>Baseline ML (KNN) + évaluation</li>
+    <li>Scripts <b>training.py</b> et <b>predict.py</b></li>
+    <li>API FastAPI : <b>/training</b> et <b>/predict</b></li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        with right:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Livrables (preuves)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Repo structuré (src/, scripts/, models/, pages/)</li>
+    <li>DB prête (tables movies/ratings/tags/links)</li>
+    <li>Modèle baseline KNN entraîné + artefact</li>
+    <li>API /docs accessible + tests OK</li>
+    <li>README : instructions d’exécution</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[1]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Données MovieLens</h3>
+  <div style="margin-top:10px; line-height:1.7;">
+    <b>Source :</b> MovieLens 20M (Ratings & Movies adaptés pour filtrage collaboratif et content-based)<br><br>
+    <b>Pré-traitement :</b><br>
+    1. <b>Ingestion :</b> Import vers PostgreSQL.<br>
+    2. <b>Nettoyage :</b> Suppression des données nulles ou inutiles.<br>
+    3. <b>Feature Eng. :</b> Jointure SQL entre ratings et movies.
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+            st.image(
+                asset("1_DataFrame.png"),
+                caption="Aperçu des données",
+                use_container_width=True,
+            )
+
+        with right:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Indicateurs rapides</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    • Nb films / users / ratings<br>
+    • Taux de sparsité<br>
+    • Top genres / tags
+  </div>
+  <div class="muted" style="margin-top:10px;">
+    (Option) Ajouter un bar chart “Top genres” et un pie “répartition genres”.
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[2]:
+        st.markdown("##### Base de Données PostgreSQL (Supabase)")
+        left, right = st.columns([0.55, 0.45], gap="large")
+
+        with left:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Pourquoi PostgreSQL plutôt que SQLite ?</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Scalabilité multi-utilisateurs</li>
+    <li>Production-ready</li>
+    <li>Meilleures performances</li>
+    <li>Cloud natif (Supabase)</li>
+  </ul>
+  <div style="height:10px;"></div>
+  <h3>Tables créées</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li><code>movies</code> : films (titres, genres)</li>
+    <li><code>ratings</code> : notes utilisateurs</li>
+    <li><code>tags</code> : tags descriptifs</li>
+    <li><code>links</code> : liens IMDB / TMDb</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+        with right:
+            st.image(
+                asset("1_Database.png"),
+                caption="Aperçu des données (Exemple)",
+                use_container_width=True,
+            )
+
+    with tabs[3]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Baseline : KNN (Collaborative Filtering)</h3>
+  <div style="margin-top:10px; line-height:1.7;">
+    <b>Pourquoi KNN ?</b><br>
+    • Simple et interprétable<br>
+    • Bon baseline pour recommandation<br>
+    • Gère bien la sparsité (avec filtrage)
+  </div>
+  <div style="height:10px;"></div>
+  <div style="margin-top:10px; line-height:1.7;">
+    <b>Configuration (ex.)</b><br>
+    • K = 20 voisins<br>
+    • Algo : ball_tree<br>
+    • Métrique : euclidienne
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+            st.write("")
+            capture_placeholder(
+                "📌 Capture à ajouter : résultat training (métriques) / artefact modèle",
+                height=220,
+            )
+
+        with right:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Résultat</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    • Entraînement rapide<br>
+    • Modèle sauvegardé (pickle)<br>
+    • Prêt pour /predict
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[4]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            st.markdown(
+                """
+<div class="card">
+  <h3>API FastAPI</h3>
+  <div style="margin-top:10px; line-height:1.7;">
+    <b>Endpoints</b><br>
+    • GET <code>/</code> : page d’accueil<br>
+    • GET <code>/health</code> : health check<br>
+    • POST <code>/training</code> : entraînement du modèle<br>
+    • POST <code>/predict</code> : recommandations
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+            st.write("")
+            capture_placeholder(
+                "📌 Capture à ajouter : FastAPI /docs (Swagger) + test predict",
+                height=260,
+            )
+        with right:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Ce que le jury doit voir</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Le service répond (health OK)</li>
+    <li>Un exemple de payload /predict</li>
+    <li>Réponse JSON (Top-N)</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[5]:
+        left, right = st.columns([0.55, 0.45], gap="large")
+        with left:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Scripts Python</h3>
+  <ul style="margin-top:10px; line-height:1.8; padding-left:18px;">
+    <li><b>scripts/load_data.py</b> : charge les données (one-shot)</li>
+    <li><b>training.py</b> : entraîne et sauvegarde le modèle</li>
+    <li><b>predict.py</b> : inférence / recommandations</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        with right:
+            st.image(
+                asset("1_DataFrame.png"),
+                caption="Aperçu des données (Exemple)",
+                use_container_width=True,
+            )
+
+    with tabs[6]:
+        left, right = st.columns([0.55, 0.45], gap="large")
+        with left:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Défis & Solutions</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    <b>Volumétrie</b> : dataset très large → <b>échantillonnage</b><br>
+    <b>Migration SQL</b> : SQLite → PostgreSQL → <b>adaptation requêtes</b><br>
+    <b>Performance</b> : preprocessing lent → <b>traitement par batch</b>
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        with right:
+            capture_placeholder(
+                "📌 (Option) capture logs / temps d'exécution", height=240
+            )
+
+
+# ============================================================
+# 7) Pages - Phase 2 Suivi
+# ============================================================
+def render_phase2():
+    st.markdown("## Phase 2 — Microservices, Suivi & Versionning")
+    st.markdown(
+        "<div class='subtitle'>MLflow : runs, comparaison, registry (versions & stages)</div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
+
+    metric_cards(
+        [
+            {"icon": "🐳", "label": "Dockerisation", "value": "8 services"},
+            {"icon": "🧭", "label": "Airflow", "value": "Planification"},
+            {"icon": "📊", "label": "MLFlow", "value": "Suivi des expériences"},
+            {"icon": "🔄", "label": "CI/CD", "value": "GitHub Actions & DockerHub"},
+        ]
+    )
+
+    tabs = st.tabs(
+        [
+            "🎯 Objectifs & Livrables",
+            "🐳 Dockerisation",
+            "🧭 Airflow",
+            "📊 MLFlow",
+            "🔄 CI/CD",
+        ]
+    )
+
+    with tabs[0]:
+        c1, c2 = st.columns([0.55, 0.45], gap="large")
+        with c1:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Objectifs (Phase 2 - 3)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Dockerisation avec communication par api sécurisée</li>
+    <li>Versionning, et désignation du modèle de production avec MLFlow</li>
+    <li>Intégration d'une CI/CD avec GitHub Actions et DockerHub</li>
+    <li>Orchestration avec Airflow</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Livrables</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Docker compose</li>
+    <li>MLflow Experiments</li>
+    <li>Pipelines GitHub Actions + Images dans DockerHub</li>
+    <li>Dags Airflow</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[1]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : MLflow Experiments (runs list)", height=320
+            )
+        with right:
+            st.markdown(
+                """
+
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[2]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : MLflow Model Registry (versions + stages)",
+                height=320,
+            )
+        with right:
+            st.markdown(
+                """
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[3]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : tableau comparatif (metrics / params)",
+                height=320,
+            )
+        with right:
+            st.markdown(
+                """
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[4]:
+
+        st.image(
+            ASSETS_DIR / "githubactions.png",
+            caption="GitHub Actions",
+            use_container_width=False,
+            width=1000,
+        )
+        st.image(
+            ASSETS_DIR / "dockerhub.png",
+            caption="DockerHub",
+            use_container_width=False,
+            width=1000,
+        )
+
+
+# ============================================================
+# 8) Pages - Phase 3 Orchestration
+# ============================================================
+def render_phase3():
+    st.markdown("## Phase 3 — Orchestration & Déploiement")
+    st.markdown(
+        "<div class='subtitle'>Docker + CI/CD + build & livraison (preuve “green”)</div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
+
+    metric_cards(
+        [
+            {"icon": "🐳", "label": "Docker", "value": "compose"},
+            {"icon": "🧪", "label": "Tests", "value": "automatiques"},
+            {"icon": "✅", "label": "CI", "value": "Actions green"},
+            {"icon": "📦", "label": "Build", "value": "image tag"},
+            {"icon": "🚀", "label": "CD", "value": "push"},
+            {"icon": "📄", "label": "README", "value": "1 commande"},
+        ]
+    )
+
+    status_wip(
+        "Phase 3 : page prête. Ajoute les captures docker-compose + GitHub Actions."
+    )
+    st.write("")
+
+    tabs = st.tabs(
+        [
+            "🎯 Objectifs & Livrables",
+            "🐳 Docker",
+            "✅ CI (Actions)",
+            "🚀 CD (Release)",
+            "🧯 Défis",
+        ]
+    )
+
+    with tabs[0]:
+        c1, c2 = st.columns([0.55, 0.45], gap="large")
+        with c1:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Objectifs (Phase 3)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Orchestrer les services (API, DB, MLflow si besoin)</li>
+    <li>Standardiser l’exécution via Docker Compose</li>
+    <li>Mettre en place CI : lint + tests + build</li>
+    <li>Déployer via pipeline (CD) + tags de version</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Livrables (preuves)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>docker-compose.yml</li>
+    <li>Workflow CI (green)</li>
+    <li>Image buildée / tags</li>
+    <li>README : “docker compose up”</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[1]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : docker-compose.yml + schéma services",
+                height=320,
+            )
+        with right:
+            st.markdown(
+                """
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[2]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : GitHub Actions (workflow green)", height=320
+            )
+        with right:
+            st.markdown(
+                """
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[3]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : Release / tags / push image", height=320
+            )
+        with right:
+            st.markdown(
+                """
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[4]:
+        capture_placeholder(
+            "📌 Capture à ajouter : Release / tags / push image", height=320
+        )
+
+
+# ============================================================
+# 9) Pages - Phase 4 Monitoring & Maintenance
+# ============================================================
+def render_phase4():
+    st.markdown("## Phase 4 — Monitoring & Maintenance")
+    st.markdown(
+        "<div class='subtitle'>Grafana/Prometheus + Evidently (drift) + stratégie retrain</div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
+
+    metric_cards(
+        [
+            {"icon": "📊", "label": "Grafana", "value": "dashboard"},
+            {"icon": "⏱️", "label": "Latence", "value": "p95"},
+            {"icon": "🚨", "label": "Erreurs", "value": "4xx/5xx"},
+            {"icon": "🌪️", "label": "Drift", "value": "Evidently"},
+            {"icon": "🔁", "label": "Retrain", "value": "rule/cron"},
+            {"icon": "🧾", "label": "Reports", "value": "HTML"},
+        ]
+    )
+
+    status_wip("Phase 4 : page prête. Ajoute les captures Grafana + rapport Evidently.")
+    st.write("")
+
+    tabs = st.tabs(
+        [
+            "🎯 Objectifs & Livrables",
+            "📊 Grafana",
+            "🌪️ Drift (Evidently)",
+            "🔁 Maintenance",
+            "🧯 Défis",
+        ]
+    )
+
+    with tabs[0]:
+        c1, c2 = st.columns([0.55, 0.45], gap="large")
+        with c1:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Objectifs (Phase 4)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Surveiller l’API : latence, erreurs, throughput</li>
+    <li>Détecter la dérive des données (data drift)</li>
+    <li>Définir une politique de maintenance (retrain)</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Livrables (preuves)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Dashboard Grafana (3–5 graphs)</li>
+    <li>Rapport Evidently (Target/Data drift)</li>
+    <li>Règle retrain : planifiée ou déclenchée</li>
+    <li>README : section Monitoring</li>
+  </ul>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[1]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : Grafana dashboard (latence, erreurs, req/s)",
+                height=320,
+            )
+        with right:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Graphiques attendus</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    • Requests / sec<br>
+    • Latence (p50/p95)<br>
+    • Erreurs (4xx/5xx)<br>
+    • CPU/RAM (option)
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[2]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            capture_placeholder(
+                "📌 Capture à ajouter : Evidently report (DataDriftPreset)", height=320
+            )
+        with right:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Drift</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    • Détection automatique<br>
+    • Seuils & alertes<br>
+    • Justifier un retrain
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[3]:
+        st.markdown(
+            """
+<div class="card">
+  <h3>Maintenance</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    <b>Scénario</b> : si drift &gt; seuil → retrain (cron ou trigger) → nouveau modèle (MLflow Registry) → prod.
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        capture_placeholder(
+            "📌 (Option) Capture : log retrain / pipeline simple", height=220
+        )
+
+    with tabs[4]:
+        st.markdown(
+            """
+<div class="card">
+  <h3>Défis & Solutions</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    <b>Choisir KPI</b> → latence, erreurs, drift<br>
+    <b>Faux positifs</b> → seuils réalistes + fenêtre temporelle<br>
+    <b>Maintenance</b> → retrain contrôlé (staging → prod)
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# 10)Pages- Phase5 Monitoring & Maintenance
+# ============================================================
+def render_phase5():
+    st.markdown("## Phase 5 — Frontend (Streamlit)")
+    st.markdown(
+        "<div class='subtitle'>UI démo pour le jury : user_id → appel API → recommandations</div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
+
+    metric_cards(
+        [
+            {"icon": "🧑", "label": "Entrée", "value": "user_id"},
+            {"icon": "🔌", "label": "Call API", "value": "/predict"},
+            {"icon": "📋", "label": "Sortie", "value": "Top-N"},
+            {"icon": "🖼️", "label": "Option", "value": "posters"},
+            {"icon": "🏷️", "label": "Option", "value": "version modèle"},
+            {"icon": "✅", "label": "Démo", "value": "30 sec"},
+        ]
+    )
+
+    tabs = st.tabs(["🎯 Objectifs", "🧪 Démo", "🧩 Widgets", "📌 Captures", "🧯 Défis"])
+
+    with tabs[0]:
+        st.markdown(
+            """
+<div class="card">
+  <h3>Objectifs (Phase 5)</h3>
+  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
+    <li>Rendre l’API utilisable par un non-tech</li>
+    <li>Démo claire : navigation + preuves (captures)</li>
+    <li>Uniformiser la charte visuelle</li>
+  </ul>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    with tabs[1]:
+        left, right = st.columns([0.6, 0.4], gap="large")
+        with left:
+            demo()
+        with right:
+            st.markdown(
+                """
+<div class="card">
+  <h3>Démo (30 sec)</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    1) Choisir un user_id<br>
+    2) Cliquer “Recommander”<br>
+    3) Afficher Top-N + (option) poster<br>
+    4) Montrer /docs en backup
+  </div>
+</div>
+""",
+                unsafe_allow_html=True,
+            )
+
+    with tabs[2]:
+        st.markdown(
+            """
+<div class="card">
+  <h3>Widgets recommandés</h3>
+  <div style="margin-top:10px; line-height:1.9;">
+    • <code>st.selectbox</code> pour user_id<br>
+    • <code>st.button</code> pour déclencher /predict<br>
+    • <code>st.dataframe</code> pour afficher le Top-N<br>
+    • <code>st.metric</code> pour infos modèle (option)<br>
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    with tabs[3]:
+        left, right = st.columns([0.5, 0.5], gap="large")
+        with left:
+            capture_placeholder("📌 Capture : page Intro (roadmap)", height=240)
+            st.write("")
+            capture_placeholder("📌 Capture : Phase 1 (DB / API)", height=240)
+        with right:
+            capture_placeholder("📌 Capture : Phase 2 (MLflow)", height=240)
+            st.write("")
+            capture_placeholder("📌 Capture : Phase 4 (Grafana/Evidently)", height=240)
+
+    with tabs[4]:
+        st.markdown(
+            """
+<div class="card">
+  <h3>Défis & Solutions</h3>
+  <div style="margin-top:10px; line-height:1.8;">
+    <b>Clarté</b> → 3 messages clés par Phases<br>
+    <b>Preuves</b> → captures intégrées<br>
+    <b>Temps</b> → démo simple, sans dépendances lourdes
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# 11)Router
+# ============================================================
+if page_key == "intro":
+    render_intro()
+elif page_key == "p1":
+    render_phase1()
+elif page_key == "p2":
+    render_phase2()
+elif page_key == "p3":
+    afficher_slide3_4()
+elif page_key == "p4":
+    afficher_slide3_4()
+elif page_key == "p5":
+    render_phase5()
