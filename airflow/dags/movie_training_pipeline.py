@@ -2,10 +2,14 @@ import logging
 import os
 from datetime import datetime, timedelta
 
+from dotenv import load_dotenv
 import requests
 from airflow.providers.standard.operators.python import PythonOperator
 
 from airflow import DAG
+
+
+load_dotenv()
 
 # Configuration
 TRAINER_API_URL = "http://movie_trainer_api:8000"

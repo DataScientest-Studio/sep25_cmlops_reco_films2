@@ -8,7 +8,11 @@ from demo import demo
 from sprint34 import afficher_slide3_4
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
-
+TRAINER_API_URL = "http://localhost:8000/docs"
+FASTAPI_KNN_URL = "http://localhost:8002/docs"
+PREDICTER_URL = "http://localhost:8001/docs"
+AIRFLOW_URL = "http://localhost:8085/"
+MLFLOW_URL = "http://localhost:5000/"
 
 def asset(filename: str) -> str:
     # Retourner le chemin absolu d'un fichier dans le dossier assets.
@@ -171,10 +175,9 @@ st.sidebar.markdown("### Présentation")
 PAGES = [
     ("intro", "Introduction: Objectif & roadmap"),
     ("p1", "1 — Fondations: Data, DB, API"),
-    ("p2", "2 — Suivi & Versionning: MLflows"),
-    ("p3", "3 — Orchestration & Déploiement"),
-    ("p4", "4 — Monitoring & Maintenance"),
-    ("p5", "5 — Frontend"),
+    ("p2", "2 — Microservice, Versionning et orchestration"),
+    ("p4", "3 — Monitoring & Maintenance"),
+    ("p5", "4 — Frontend"),
 ]
 PAGE_LABEL = {k: v for k, v in PAGES}
 
@@ -718,6 +721,7 @@ def render_phase2():
         [
             "🎯 Objectifs & Livrables",
             "🐳 Dockerisation",
+            "🐳 FastAPI",
             "🧭 Airflow",
             "📊 MLFlow",
             "🔄 CI/CD",
@@ -760,9 +764,12 @@ def render_phase2():
     with tabs[1]:
         left, right = st.columns([0.6, 0.4], gap="large")
         with left:
-            capture_placeholder(
-                "📌 Capture à ajouter : MLflow Experiments (runs list)", height=320
-            )
+           st.image(
+            ASSETS_DIR / "archi_docker.png",
+            caption="GitHub Actions",
+            use_container_width=False,
+            width=1000,
+        )
         with right:
             st.markdown(
                 """
@@ -772,34 +779,72 @@ def render_phase2():
             )
 
     with tabs[2]:
-        left, right = st.columns([0.6, 0.4], gap="large")
-        with left:
-            capture_placeholder(
-                "📌 Capture à ajouter : MLflow Model Registry (versions + stages)",
-                height=320,
-            )
-        with right:
-            st.markdown(
-                """
-""",
-                unsafe_allow_html=True,
-            )
-
+        st.components.v1.html(f"""
+          <div style="
+              border:2px solid black;       /* contour noir */
+              border-radius:8px;            /* coins arrondis */
+              width:1220px;                 /* pour inclure padding */
+          ">
+              <iframe 
+                  src="{PREDICTER_URL}" 
+                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
+                  scrolling="yes">
+              </iframe>
+          </div>
+          """, height=420)
+        st.components.v1.html(f"""
+          <div style="
+              border:2px solid black;       /* contour noir */
+              border-radius:8px;            /* coins arrondis */
+              width:1220px;                 /* pour inclure padding */
+          ">
+              <iframe 
+                  src="{TRAINER_API_URL}" 
+                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
+                  scrolling="yes">
+              </iframe>
+          </div>
+          """, height=420)
+        st.components.v1.html(f"""
+          <div style="
+              border:2px solid black;       /* contour noir */
+              border-radius:8px;            /* coins arrondis */
+              width:1220px;                 /* pour inclure padding */
+          ">
+              <iframe 
+                  src="{FASTAPI_KNN_URL}" 
+                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
+                  scrolling="yes">
+              </iframe>
+          </div>
+          """, height=420)
     with tabs[3]:
-        left, right = st.columns([0.6, 0.4], gap="large")
-        with left:
-            capture_placeholder(
-                "📌 Capture à ajouter : tableau comparatif (metrics / params)",
-                height=320,
-            )
-        with right:
-            st.markdown(
-                """
-""",
-                unsafe_allow_html=True,
-            )
+        st.components.v1.html(f"""
+          <div style="width:100%; height:800px; border:2px solid black; border-radius:6px;">
+              <iframe 
+                  src="{AIRFLOW_URL}" 
+                  scrolling="yes"
+                  style="width:100%; height:100%;">
+              </iframe>
+          </div>
+          """, height=3000)
 
     with tabs[4]:
+        st.components.v1.html(f"""
+          <div style="
+              border:2px solid black;       /* contour noir */
+              border-radius:8px;            /* coins arrondis */
+              padding:4px;                  /* petit padding autour */
+              width:1220px;                 /* pour inclure padding */
+          ">
+              <iframe 
+                  src="{MLFLOW_URL}" 
+                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
+                  scrolling="yes">
+              </iframe>
+          </div>
+          """, height=3000)
+    with tabs[5]:
 
         st.image(
             ASSETS_DIR / "githubactions.png",
@@ -1186,8 +1231,6 @@ elif page_key == "p1":
     render_phase1()
 elif page_key == "p2":
     render_phase2()
-elif page_key == "p3":
-    afficher_slide3_4()
 elif page_key == "p4":
     afficher_slide3_4()
 elif page_key == "p5":

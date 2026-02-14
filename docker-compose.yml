@@ -13,6 +13,7 @@ services:
       - mlflow-net
     environment:
       - MLFLOW_SERVER_ALLOWED_HOSTS=*
+      - MLFLOW_ENABLE_XFRAME_HEADERS=false
     env_file:
       - .env
     command: >
