@@ -2,12 +2,11 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from dotenv import load_dotenv
 import requests
 from airflow.providers.standard.operators.python import PythonOperator
+from dotenv import load_dotenv
 
 from airflow import DAG
-
 
 load_dotenv()
 

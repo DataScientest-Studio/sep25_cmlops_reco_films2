@@ -3,7 +3,6 @@ import textwrap
 from pathlib import Path
 
 import streamlit as st
-
 from demo import demo
 from sprint34 import afficher_slide3_4
 
@@ -13,6 +12,7 @@ FASTAPI_KNN_URL = "http://localhost:8002/docs"
 PREDICTER_URL = "http://localhost:8001/docs"
 AIRFLOW_URL = "http://localhost:8085/"
 MLFLOW_URL = "http://localhost:5000/"
+
 
 def asset(filename: str) -> str:
     # Retourner le chemin absolu d'un fichier dans le dossier assets.
@@ -764,12 +764,12 @@ def render_phase2():
     with tabs[1]:
         left, right = st.columns([0.6, 0.4], gap="large")
         with left:
-           st.image(
-            ASSETS_DIR / "archi_docker.png",
-            caption="GitHub Actions",
-            use_container_width=False,
-            width=1000,
-        )
+            st.image(
+                ASSETS_DIR / "archi_docker.png",
+                caption="GitHub Actions",
+                use_container_width=False,
+                width=1000,
+            )
         with right:
             st.markdown(
                 """
@@ -779,7 +779,8 @@ def render_phase2():
             )
 
     with tabs[2]:
-        st.components.v1.html(f"""
+        st.components.v1.html(
+            f"""
           <div style="
               border:2px solid black;       /* contour noir */
               border-radius:8px;            /* coins arrondis */
@@ -791,8 +792,11 @@ def render_phase2():
                   scrolling="yes">
               </iframe>
           </div>
-          """, height=420)
-        st.components.v1.html(f"""
+          """,
+            height=420,
+        )
+        st.components.v1.html(
+            f"""
           <div style="
               border:2px solid black;       /* contour noir */
               border-radius:8px;            /* coins arrondis */
@@ -804,8 +808,11 @@ def render_phase2():
                   scrolling="yes">
               </iframe>
           </div>
-          """, height=420)
-        st.components.v1.html(f"""
+          """,
+            height=420,
+        )
+        st.components.v1.html(
+            f"""
           <div style="
               border:2px solid black;       /* contour noir */
               border-radius:8px;            /* coins arrondis */
@@ -817,9 +824,12 @@ def render_phase2():
                   scrolling="yes">
               </iframe>
           </div>
-          """, height=420)
+          """,
+            height=420,
+        )
     with tabs[3]:
-        st.components.v1.html(f"""
+        st.components.v1.html(
+            f"""
           <div style="width:100%; height:800px; border:2px solid black; border-radius:6px;">
               <iframe 
                   src="{AIRFLOW_URL}" 
@@ -827,10 +837,13 @@ def render_phase2():
                   style="width:100%; height:100%;">
               </iframe>
           </div>
-          """, height=3000)
+          """,
+            height=3000,
+        )
 
     with tabs[4]:
-        st.components.v1.html(f"""
+        st.components.v1.html(
+            f"""
           <div style="
               border:2px solid black;       /* contour noir */
               border-radius:8px;            /* coins arrondis */
@@ -843,7 +856,9 @@ def render_phase2():
                   scrolling="yes">
               </iframe>
           </div>
-          """, height=3000)
+          """,
+            height=3000,
+        )
     with tabs[5]:
 
         st.image(
