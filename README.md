@@ -13,6 +13,7 @@ Système de recommandation de films type « Netflix » développé dans le cadre
 - [Installation et démarrage](#installation-et-démarrage)
 - [Fonctionnement](#fonctionnement)
 - [Variables d'environnement](#variables-denvironnement)
+- [Monitoring (Grafana & Evidently)](#monitoring-grafana--evidently)
 - [Structure du projet](#structure-du-projet)
 
 ---
@@ -25,6 +26,7 @@ RecoFilm permet à un utilisateur de saisir son identifiant (`user_id`) et d'obt
 - **Base de données** : PostgreSQL (Supabase)
 - **Modèles** : KNN (collaborative filtering) et SVD (matrix factorization)
 - **MLOps** : MLflow (suivi des expériences), Airflow (orchestration), Docker (conteneurisation)
+- **Monitoring** : Grafana (dashboards), Prometheus (métriques), Evidently (détection de data drift)
 
 ---
 
@@ -182,6 +184,31 @@ Les services `trainer`, `predicter`, `knn_api` et `mlflow` utilisent le `.env` r
 
 ---
 
+## Monitoring (Grafana & Evidently)
+
+Le projet intègre une stack de monitoring pour surveiller les performances des APIs et détecter la dérive des données.
+
+### Grafana + Prometheus
+
+- **Prometheus** : collecte les métriques exposées par l'API KNN via `prometheus-fastapi-instrumentator` (endpoint `/metrics`).
+- **Grafana** : dashboard avec 4 panels principaux :
+  1. **Temps de réponse** — durée des requêtes HTTP par endpoint
+  2. **Erreurs HTTP** — nombre d'erreurs 4xx/5xx par endpoint
+  3. **Requêtes par seconde** — taux de requêtes par endpoint et statut
+  4. **Requêtes actives** — nombre de requêtes en cours de traitement
+
+L'API KNN expose automatiquement les métriques Prometheus (latence, erreurs, throughput).
+
+### Evidently (Data Drift)
+
+- **Détection de drift** : scripts dans `knn_api/monitoring/` :
+  - `drift_detection.py` — compare les données de référence (CSV) avec les données courantes (Supabase) via `DataDriftPreset` et `DataQualityPreset`
+  - `auto_retrain.py` — déclenche un retrain automatique en cas de drift détecté
+- **Rapports** : génération de rapports HTML pour visualiser la dérive des données (Target drift, Data drift).
+- **Stratégie de maintenance** : en cas de drift au-delà du seuil, un retrain peut être déclenché (règle ou cron).
+
+---
+
 ## Structure du projet
 
 ```
@@ -195,6 +222,7 @@ sep25_cmlops_reco_films2/
 ├── trainer/                 # API d'entraînement SVD + insert-data
 ├── predicter/               # API de prédiction SVD
 ├── knn_api/                 # API KNN (training + predict + auth)
+│   └── monitoring/          # Evidently (drift_detection, auto_retrain)
 ├── streamlit-ui/             # Interface Streamlit
 │   ├── app.py
 │   ├── demo.py
