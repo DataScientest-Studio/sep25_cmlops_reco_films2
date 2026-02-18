@@ -81,7 +81,7 @@ def load_current_data_from_supabase():
 
     # Reconstruire user_matrix
     print("\n4. Reconstruction de user_matrix...")
-    user_matrix_current = reconstruct_user_matrix(ratings)
+    user_matrix_current = reconstruct_user_matrix(ratings, movies)
 
     return movie_matrix_current, user_matrix_current
 
@@ -147,31 +147,45 @@ def reconstruct_movie_matrix(ratings, movies):
     return movie_matrix
 
 
-def reconstruct_user_matrix(ratings):
+
+def reconstruct_user_matrix(ratings, movies):
     """
     Reconstruit la user_matrix à partir des ratings actuels
-
-    Args:
-        ratings: DataFrame des ratings
-
-    Returns:
-        user_matrix: DataFrame reconstruit
+    Inclut les proportions de genres comme la matrice de référence
     """
-    # Calculer les stats par utilisateur
+    genres_list = [
+        "Action", "Adventure", "Animation", "Children", "Comedy", "Crime",
+        "Documentary", "Drama", "Fantasy", "Film-Noir", "Horror", "IMAX",
+        "Musical", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western",
+    ]
+
+    # Ajouter les colonnes de genres aux ratings
+    movies_copy = movies.copy()
+    for genre in genres_list:
+        movies_copy[genre] = movies_copy["genres"].str.contains(genre, na=False).astype(int)
+
+    # Joindre ratings avec les genres des films
+    ratings_with_genres = ratings.merge(movies_copy[["movieid"] + genres_list], on="movieid", how="left")
+
+    # Calculer les stats de base par utilisateur
     user_stats = (
         ratings.groupby("userid").agg({"rating": ["mean", "count"]}).reset_index()
     )
-
     user_stats.columns = ["userid", "avg_rating_given", "num_ratings_given"]
 
-    # Calculer les préférences de genres
-    # Pour simplifier, on va juste garder les stats de base
-    # Dans un vrai système, il faudrait recalculer les préférences de genres
+    # Calculer les proportions de genres par utilisateur
+    genre_props = ratings_with_genres.groupby("userid")[genres_list].mean().reset_index()
 
-    print(f"   User matrix reconstruite: {len(user_stats)} utilisateurs")
+    # Merger tout ensemble
+    user_matrix = user_stats.merge(genre_props, on="userid", how="left")
 
-    return user_stats
+    # Réordonner les colonnes pour correspondre à la référence
+    cols = ["userid"] + genres_list + ["avg_rating_given", "num_ratings_given"]
+    user_matrix = user_matrix[cols]
 
+    print(f"   User matrix reconstruite: {len(user_matrix)} utilisateurs")
+
+    return user_matrix
 
 def generate_drift_report(reference_data, current_data, output_path, report_name):
     """

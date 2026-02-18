@@ -23,7 +23,7 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 
 # Donner les droits d'exécution au script
-RUN chmod +x /app/start.sh
+RUN sed -i 's/\r//' /app/start.sh && chmod +x /app/start.sh
 
 # Commande de démarrage
 CMD ["./start.sh"]
