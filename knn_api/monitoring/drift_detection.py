@@ -10,10 +10,8 @@ from pathlib import Path
 import pandas as pd
 from evidently.metric_preset import DataDriftPreset, DataQualityPreset
 from evidently.report import Report
-
-# Ajouter le chemin pour importer config
-sys.path.append(str(Path(__file__).parent.parent.parent / "database"))
 from config import get_connection
+
 
 
 def load_reference_data():
@@ -26,9 +24,9 @@ def load_reference_data():
     """
     print("\n1. Chargement des données de référence (CSV)...")
 
-    project_root = Path(__file__).parent.parent.parent
-    movie_matrix_path = project_root / "data" / "processed" / "movie_matrix.csv"
-    user_matrix_path = project_root / "data" / "processed" / "user_matrix.csv"
+    project_root = Path(__file__).resolve().parent
+    movie_matrix_path = project_root / ".." / "api" /  "movie_matrix.csv"
+    user_matrix_path = project_root / ".." / "api" /  "user_matrix.csv"
 
     if not movie_matrix_path.exists():
         raise FileNotFoundError(f"Movie matrix non trouvée: {movie_matrix_path}")

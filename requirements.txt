@@ -60,8 +60,8 @@ pydantic_core==2.41.5
 pyparsing==3.2.5
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
-pytz==2025.2
-pywin32==311
+pytz==2024.1
+pywin32==311;platform_system == "Windows"
 PyYAML==6.0.3
 requests==2.32.5
 rsa==4.9.1

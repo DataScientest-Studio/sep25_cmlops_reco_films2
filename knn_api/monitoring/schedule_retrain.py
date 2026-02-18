@@ -20,8 +20,8 @@ def run_auto_retrain():
     print(f" DÉCLENCHEMENT PLANIFIÉ: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 
-    project_root = Path(__file__).parent.parent.parent
-    auto_retrain_script = project_root / "src" / "monitoring" / "auto_retrain.py"
+    project_root = Path(__file__).resolve().parent
+    auto_retrain_script = project_root / "auto_retrain.py"
 
     try:
         result = subprocess.run(
@@ -48,13 +48,13 @@ def main():
     scheduler = BlockingScheduler()
 
     # Option 1: Tous les jours à 2h du matin
-    scheduler.add_job(
-        run_auto_retrain,
-        CronTrigger(hour=2, minute=0),
-        id="daily_retrain_check",
-        name="Vérification quotidienne du drift et réentraînement",
-        replace_existing=True,
-    )
+    #scheduler.add_job(
+    #    run_auto_retrain,
+    #    CronTrigger(hour=2, minute=0),
+    #    id="daily_retrain_check",
+    #    name="Vérification quotidienne du drift et réentraînement",
+    #    replace_existing=True,
+    #)
 
     # Option 2: Toutes les heures (démo)
     # scheduler.add_job(
@@ -66,14 +66,14 @@ def main():
     # )
 
     # Option 3: Toutes les 5 minutes (test)
-    # scheduler.add_job(
-    #     run_auto_retrain,
-    #     'interval',
-    #     minutes=5,
-    #     id='test_retrain_check',
-    #     name='Test - Vérification toutes les 5 minutes',
-    #     replace_existing=True
-    # )
+    scheduler.add_job(
+        run_auto_retrain,
+        'interval',
+        minutes=5,
+        id='test_retrain_check',
+        name='Test - Vérification toutes les 5 minutes',
+        replace_existing=True
+    )
 
     print("\n PLANIFICATION CONFIGURÉE:")
     print("    Vérification quotidienne du drift à 2h00 du matin")

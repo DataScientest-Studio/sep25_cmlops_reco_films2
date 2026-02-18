@@ -22,11 +22,8 @@ EXPOSE 8000
 # Variable d'environnement pour Python (évite les problèmes de buffering)
 ENV PYTHONUNBUFFERED=1
 
-# Variable d'environnement pour Python (évite les problèmes de buffering)
-ENV PYTHONUNBUFFERED=1
-
-# ⭐ NOUVEAU : Désactiver IPv6 ⭐
-RUN echo "precedence ::ffff:0:0/96  100" >> /etc/gai.conf
+# Donner les droits d'exécution au script
+RUN chmod +x /app/start.sh
 
 # Commande de démarrage
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./start.sh"]

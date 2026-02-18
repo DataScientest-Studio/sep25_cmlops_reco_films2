@@ -9,10 +9,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# Ajouter les chemins nécessaires
-sys.path.append(str(Path(__file__).parent.parent.parent / "database"))
-sys.path.append(str(Path(__file__).parent))
-
 from drift_detection import (
     load_current_data_from_supabase,
     load_reference_data,
@@ -21,7 +17,6 @@ from drift_detection import (
 )
 from evidently.metric_preset import DataDriftPreset
 from evidently.report import Report
-
 
 def calculate_drift_score(reference_data, current_data):
     """
@@ -100,9 +95,8 @@ def trigger_retraining():
         message: Message de résultat
     """
     print("\n Lancement du réentraînement du modèle...")
-
-    project_root = Path(__file__).parent.parent.parent
-    train_script = project_root / "src" / "models" / "train_model.py"
+    project_root = Path(__file__).resolve().parent.parent
+    train_script = project_root / "api" / "train_model.py"
 
     if not train_script.exists():
         return False, f"Script d'entraînement non trouvé: {train_script}"
@@ -166,6 +160,7 @@ def main():
     print("=" * 60)
     print("RÉENTRAÎNEMENT AUTOMATIQUE BASÉ SUR LA DÉTECTION DE DRIFT")
     print("=" * 60)
+
 
     try:
         # 1. Charger les données de référence
