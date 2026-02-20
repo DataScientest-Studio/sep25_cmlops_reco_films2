@@ -12,7 +12,7 @@ def afficher_slide3_4():
         page_title="Sprint 4 - Monitoring", page_icon="📊", layout="wide"
     )
 
-    st.title("📊 Sprint 4 — Monitoring & Maintenance")
+    st.markdown("## Phase 4 — Monitoring & Maintenance")
     st.markdown("**Grafana/Prometheus + Evidently (drift) + stratégie retrain**")
 
     st.markdown("---")

@@ -7,7 +7,7 @@ from demo import demo
 from sprint34 import afficher_slide3_4
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
-TRAINER_API_URL = "http://localhost:8000/docs"
+TRAINER_API_URL = "http://localhost:8003/docs"
 FASTAPI_KNN_URL = "http://localhost:8002/docs"
 PREDICTER_URL = "http://localhost:8001/docs"
 AIRFLOW_URL = "http://localhost:8085/"
@@ -423,37 +423,23 @@ def render_intro():
 # ============================================================
 def render_phase1():
     st.markdown("## Phase 1 — Fondations")
-    st.markdown(
-        "<div class='subtitle'>Deadline : 3 Novembre 2025</div>", unsafe_allow_html=True
-    )
+    st.markdown("<div class='subtitle'>Deadline : 3 Novembre 2025</div>", unsafe_allow_html=True)
     st.write("")
 
     # Top metrics
-    metric_cards(
-        [
-            {"icon": "🎬", "label": "Films", "value": "14026"},
-            {"icon": "👥", "label": "Utilisateurs", "value": "7120"},
-            {"icon": "⭐", "label": "Ratings", "value": "10M"},
-            {"icon": "🗄️", "label": "DB", "value": "PostgreSQL"},
-            {"icon": "🤖", "label": "Modèle", "value": "KNN"},
-            {"icon": "📜", "label": "Scripts", "value": "training + predict"},
-        ]
-    )
+    metric_cards([
+        {"icon":"🎬", "label":"Films", "value":"14026"},
+        {"icon":"👥", "label":"Utilisateurs", "value":"7120"},
+        {"icon":"⭐", "label":"Ratings", "value":"10M"},
+        {"icon":"🗄️", "label":"DB", "value":"PostgreSQL"},
+        {"icon":"🤖", "label":"Modèle", "value":"KNN/SVD"},
+        {"icon":"📜", "label":"Scripts", "value":"training + predict"},
+    ])
 
-    status_ok("Phase 1 livrée : data + DB + baseline ML + API opérationnelle")
+    status_ok("Phase 1 livrée : data + DB + ML + API")
     st.write("")
 
-    tabs = st.tabs(
-        [
-            "🎯 Objectifs & Livrables",
-            "🧹 Données",
-            "🗄️ DB",
-            "🤖 Modèle",
-            "🧩 API",
-            "📜 Scripts",
-            "🧯 Défis",
-        ]
-    )
+    tabs = st.tabs(["🎯 Objectifs & Livrables", "🧹 Données", "🗄️ DB", "🤖 Modèle", "🧩 API", "📜 Scripts", "🧯 Défis"])
 
     with tabs[0]:
         left, right = st.columns([0.55, 0.45], gap="large")
@@ -464,12 +450,10 @@ def render_phase1():
   <h3>Objectifs (Sprint 1)</h3>
   <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
     <li>Définir une roadmap et poser l’architecture</li>
-    <li>Environnement reproductible (venv + requirements)</li>
+    <li>Environnement docker + FastAPI</li>
     <li>Collecte + prétraitement des données</li>
-    <li>Créer une DB et la remplir (script one-shot)</li>
-    <li>Baseline ML (KNN) + évaluation</li>
-    <li>Scripts <b>training.py</b> et <b>predict.py</b></li>
-    <li>API FastAPI : <b>/training</b> et <b>/predict</b></li>
+    <li>Créer une DB</li>
+    <li>Créer les modèles : KNN / SVD</li>
   </ul>
 </div>
 """,
@@ -493,14 +477,14 @@ def render_phase1():
             )
 
     with tabs[1]:
-        left, right = st.columns([0.6, 0.4], gap="large")
-        with left:
-            st.markdown(
-                """
+        st.markdown(
+            """
 <div class="card">
   <h3>Données MovieLens</h3>
   <div style="margin-top:10px; line-height:1.7;">
-    <b>Source :</b> MovieLens 20M (Ratings & Movies adaptés pour filtrage collaboratif et content-based)<br><br>
+    <b>Sources :</b><br>
+    • <b>MovieLens 20M</b> (fourni par le projet) : ratings, movies, tags, links<br>
+    • <b>Kaggle</b> : MovieLens 20M Posters — métadonnées complémentaires<br><br>
     <b>Pré-traitement :</b><br>
     1. <b>Ingestion :</b> Import vers PostgreSQL.<br>
     2. <b>Nettoyage :</b> Suppression des données nulles ou inutiles.<br>
@@ -508,48 +492,19 @@ def render_phase1():
   </div>
 </div>
 """,
-                unsafe_allow_html=True,
-            )
-            st.image(
-                asset("1_DataFrame.png"),
-                caption="Aperçu des données",
-                use_container_width=True,
-            )
-
-        with right:
-            st.markdown(
-                """
-<div class="card">
-  <h3>Indicateurs rapides</h3>
-  <div style="margin-top:10px; line-height:1.8;">
-    • Nb films / users / ratings<br>
-    • Taux de sparsité<br>
-    • Top genres / tags
-  </div>
-  <div class="muted" style="margin-top:10px;">
-    (Option) Ajouter un bar chart “Top genres” et un pie “répartition genres”.
-  </div>
-</div>
-""",
-                unsafe_allow_html=True,
-            )
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        st.image(asset("1_DataFrame.png"), caption="Aperçu des données", use_container_width=True)
 
     with tabs[2]:
         st.markdown("##### Base de Données PostgreSQL (Supabase)")
-        left, right = st.columns([0.55, 0.45], gap="large")
+        left, right = st.columns([0.35, 0.65], gap="large")
 
         with left:
             st.markdown(
                 """
 <div class="card">
-  <h3>Pourquoi PostgreSQL plutôt que SQLite ?</h3>
-  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
-    <li>Scalabilité multi-utilisateurs</li>
-    <li>Production-ready</li>
-    <li>Meilleures performances</li>
-    <li>Cloud natif (Supabase)</li>
-  </ul>
-  <div style="height:10px;"></div>
   <h3>Tables créées</h3>
   <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
     <li><code>movies</code> : films (titres, genres)</li>
@@ -563,11 +518,9 @@ def render_phase1():
             )
 
         with right:
-            st.image(
-                asset("1_Database.png"),
-                caption="Aperçu des données (Exemple)",
-                use_container_width=True,
-            )
+             st.image(asset("1_Database.png"), caption="Aperçu des données (Exemple)", use_container_width=True)
+
+      
 
     with tabs[3]:
         left, right = st.columns([0.6, 0.4], gap="large")
@@ -594,20 +547,13 @@ def render_phase1():
                 unsafe_allow_html=True,
             )
             st.write("")
-            capture_placeholder(
-                "📌 Capture à ajouter : résultat training (métriques) / artefact modèle",
-                height=220,
-            )
-
-        with right:
             st.markdown(
                 """
 <div class="card">
-  <h3>Résultat</h3>
-  <div style="margin-top:10px; line-height:1.8;">
-    • Entraînement rapide<br>
-    • Modèle sauvegardé (pickle)<br>
-    • Prêt pour /predict
+  <div style="margin-top:10px; line-height:1.7;">
+    <b>Baseline :</b> KNN → Simple, interprétable, bon point de départ<br>
+    <b>Amélioration :</b> SVD → Matrice de factorisation, meilleure précision sur données sparses<br>
+    <b>Comparaison via MLflow</b> → RMSE comme métrique de sélection
   </div>
 </div>
 """,
@@ -633,24 +579,7 @@ def render_phase1():
                 unsafe_allow_html=True,
             )
             st.write("")
-            capture_placeholder(
-                "📌 Capture à ajouter : FastAPI /docs (Swagger) + test predict",
-                height=260,
-            )
-        with right:
-            st.markdown(
-                """
-<div class="card">
-  <h3>Ce que le jury doit voir</h3>
-  <ul style="margin-top:10px; line-height:1.7; padding-left:18px;">
-    <li>Le service répond (health OK)</li>
-    <li>Un exemple de payload /predict</li>
-    <li>Réponse JSON (Top-N)</li>
-  </ul>
-</div>
-""",
-                unsafe_allow_html=True,
-            )
+            st.image(asset("1_FastAPI.png"), caption="FastAPI /docs (Swagger) + test predict", use_container_width=True)
 
     with tabs[5]:
         left, right = st.columns([0.55, 0.45], gap="large")
@@ -669,11 +598,7 @@ def render_phase1():
                 unsafe_allow_html=True,
             )
         with right:
-            st.image(
-                asset("1_DataFrame.png"),
-                caption="Aperçu des données (Exemple)",
-                use_container_width=True,
-            )
+            pass
 
     with tabs[6]:
         left, right = st.columns([0.55, 0.45], gap="large")
@@ -692,16 +617,15 @@ def render_phase1():
                 unsafe_allow_html=True,
             )
         with right:
-            capture_placeholder(
-                "📌 (Option) capture logs / temps d'exécution", height=240
-            )
+            pass
+
 
 
 # ============================================================
 # 7) Pages - Phase 2 Suivi
 # ============================================================
 def render_phase2():
-    st.markdown("## Phase 2 — Microservices, Suivi & Versionning")
+    st.markdown("## Phase 2/3 — Microservices, Suivi & Versionning")
     st.markdown(
         "<div class='subtitle'>MLflow : runs, comparaison, registry (versions & stages)</div>",
         unsafe_allow_html=True,
