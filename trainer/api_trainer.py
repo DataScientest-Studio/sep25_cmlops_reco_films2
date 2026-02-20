@@ -226,7 +226,7 @@ def train_svd_model():
 
     params = {"n_factors": 50, "n_epochs": 20, "lr_all": 0.005, "reg_all": 0.02}
 
-    mlflow.set_experiment("recofilm-svg-recommender")
+    mlflow.set_experiment("recofilm-svd-recommender")
 
     with mlflow.start_run() as run:
         algo, rmse, mae = train_and_evaluate(trainset, testset, params)
