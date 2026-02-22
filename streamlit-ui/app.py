@@ -216,7 +216,7 @@ def show_image_or_placeholder(filename: str, caption: str, height: int = 360):
     # Afficher l'image si elle existe, sinon placeholder.
     img_path = ASSETS_DIR / filename
     if img_path.exists():
-        st.image(asset(filename), use_container_width=True, caption=caption)
+        st.image(asset(filename), width='stretch', caption=caption)
     else:
         capture_placeholder(
             f"📌 Image à ajouter : <b>{caption}</b><br><span class='muted'>Fichier : {filename}</span>",
@@ -353,7 +353,7 @@ def render_intro():
     # helper local pour afficher image si dispo sinon placeholder
     def show_image_or_placeholder(path: str, caption: str, height: int = 360):
         if path and os.path.exists(path):
-            st.image(path, use_container_width=True, caption=caption)
+            st.image(path, width='stretch', caption=caption)
         else:
             capture_placeholder(
                 f"📌 Image à ajouter : <b>{caption}</b><br><span class='muted'>Chemin : {path}</span>",
@@ -497,7 +497,7 @@ def render_phase1():
             unsafe_allow_html=True,
         )
         st.write("")
-        st.image(asset("1_DataFrame.png"), caption="Aperçu des données", use_container_width=True)
+        st.image(asset("1_DataFrame.png"), caption="Aperçu des données", width='stretch')
 
     with tabs[2]:
         st.markdown("##### Base de Données PostgreSQL (Supabase)")
@@ -520,7 +520,7 @@ def render_phase1():
             )
 
         with right:
-             st.image(asset("1_Database.png"), caption="Aperçu des données (Exemple)", use_container_width=True)
+             st.image(asset("1_Database.png"), caption="Aperçu des données (Exemple)", width='stretch')
 
       
 
@@ -581,7 +581,7 @@ def render_phase1():
                 unsafe_allow_html=True,
             )
             st.write("")
-            st.image(asset("1_FastAPI.png"), caption="FastAPI /docs (Swagger) + test predict", use_container_width=True)
+            st.image(asset("1_FastAPI.png"), caption="FastAPI /docs (Swagger) + test predict", width='stretch')
 
     with tabs[5]:
         left, right = st.columns([0.55, 0.45], gap="large")
@@ -1083,24 +1083,7 @@ def render_phase5():
         )
 
     with tabs[1]:
-        left, right = st.columns([0.6, 0.4], gap="large")
-        with left:
             demo()
-        with right:
-            st.markdown(
-                """
-<div class="card">
-  <h3>Démo (30 sec)</h3>
-  <div style="margin-top:10px; line-height:1.8;">
-    1) Choisir un user_id<br>
-    2) Cliquer “Recommander”<br>
-    3) Afficher Top-N + (option) poster<br>
-    4) Montrer /docs en backup
-  </div>
-</div>
-""",
-                unsafe_allow_html=True,
-            )
 # ============================================================
 # 6) Pages - Phase 6 Conclusion & Next Steps  -- à ajouter après le demo
 # ============================================================

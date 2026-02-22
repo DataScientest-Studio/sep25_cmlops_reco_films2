@@ -168,6 +168,11 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+      movie_trainer_api: 
+        condition: service_started
+      knn_api: 
+        condition: service_started
+    
     networks:
       - mlflow-net
     env_file:
