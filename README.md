@@ -13,7 +13,7 @@ Système de recommandation de films type « Netflix » développé dans le cadre
 - [Installation et démarrage](#installation-et-démarrage)
 - [Fonctionnement](#fonctionnement)
 - [Variables d'environnement](#variables-denvironnement)
-- [Monitoring (Grafana & Evidently)](#monitoring-grafana--evidently)
+- [Monitoring (Grafana, Prometheus & Evidently)](#monitoring-grafana-prometheus--evidently)
 - [Structure du projet](#structure-du-projet)
 
 ---
@@ -33,25 +33,37 @@ RecoFilm permet à un utilisateur de saisir son identifiant (`user_id`) et d'obt
 ## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Streamlit UI  │────▶│   KNN API        │────▶│   PostgreSQL    │
-│   (8501)        │     │   (8002)         │     │   (Supabase)    │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-         │                         │
-         │                         │
-         ▼                         ▼
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Predicter API  │     │   Trainer API    │     │   MLflow        │
-│   (8001)         │     │   (8000)         │     │   (5000)        │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-         │                         │
-         └────────────┬────────────┘
-                      │
-                      ▼
-              ┌──────────────────┐
-              │   Airflow        │
-              │   (8085)         │
-              └──────────────────┘
+                    ┌─────────────────┐
+                    │   Streamlit UI  │
+                    │   (8501)        │
+                    └────────┬────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         ▼                   ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│   KNN API       │ │  Predicter API  │ │  Trainer API     │
+│   (8002)        │ │  (8001)         │ │  (8003)          │
+└────────┬────────┘ └────────┬────────┘ └────────┬────────┘
+         │                   │                   │
+         │                   └─────────┬─────────┘
+         │                             ▼
+         │                    ┌─────────────────┐
+         │                    │   MLflow        │
+         │                    │   (5001)        │
+         │                    └─────────────────┘
+         │
+         ▼
+┌─────────────────┐     ┌─────────────────┐
+│   Prometheus    │────▶│   Grafana       │
+│   (9090)        │     │   (3000)        │
+└─────────────────┘     └─────────────────┘
+         ▲
+         │ scrape /metrics
+         │
+┌────────┴────────┐     ┌─────────────────┐
+│   PostgreSQL    │     │   Airflow        │
+│   (Supabase)    │     │   (8085)         │
+└─────────────────┘     └─────────────────┘
 ```
 
 ---
@@ -60,22 +72,26 @@ RecoFilm permet à un utilisateur de saisir son identifiant (`user_id`) et d'obt
 
 | Service | Port hôte | Port conteneur | Description |
 |---------|-----------|----------------|-------------|
-| **MLflow** | 5000 | 5000 | Suivi des expériences ML, registry des modèles |
-| **Trainer API** | 8000 | 8000 | Entraînement SVD, insertion des données |
+| **MLflow** | 5001 | 5000 | Suivi des expériences ML, registry des modèles |
+| **Trainer API** | 8003 | 8000 | Entraînement SVD, insertion des données |
 | **Predicter API** | 8001 | 8000 | Prédictions SVD (recommandations) |
-| **KNN API** | 8002 | 8000 | Entraînement KNN, prédictions, authentification JWT |
+| **KNN API** | 8002 | 8000 | Entraînement KNN, prédictions, authentification JWT, métriques Prometheus |
 | **Streamlit UI** | 8501 | 8501 | Interface utilisateur de démonstration |
+| **Prometheus** | 9090 | 9090 | Collecte des métriques (scrape de l'API KNN) |
+| **Grafana** | 3000 | 3000 | Dashboards de monitoring |
 | **Airflow** | 8085 | 8080 | Orchestration des pipelines (training, insert-data) |
-| **PostgreSQL** | — | 5432 | Base de données (interne au réseau Docker) |
+| **PostgreSQL** | — | 5432 | Base Airflow (interne). Données métier : Supabase |
 
 ### URLs d'accès (localhost)
 
 | Service | URL |
 |---------|-----|
 | Interface RecoFilm | http://localhost:8501 |
-| MLflow | http://localhost:5000 |
+| MLflow | http://localhost:5001 |
 | Airflow | http://localhost:8085 |
-| Trainer API (Swagger) | http://localhost:8000/docs |
+| Grafana | http://localhost:3000 (admin / admin) |
+| Prometheus | http://localhost:9090 |
+| Trainer API (Swagger) | http://localhost:8003/docs |
 | Predicter API (Swagger) | http://localhost:8001/docs |
 | KNN API (Swagger) | http://localhost:8002/docs |
 
@@ -108,17 +124,23 @@ Créer un fichier `.env` à la racine du projet (voir section dédiée ci-dessou
 docker compose up -d
 ```
 
+Les services **Prometheus** et **Grafana** sont inclus dans le `docker-compose` et démarrent avec le reste de la stack.
+
 ### 4. Attendre le démarrage
 
 - **MLflow** : ~30 s  
 - **Trainer / Predicter / KNN API** : ~1 min  
 - **Streamlit** : ~30 s  
+- **Prometheus / Grafana** : ~30 s  
 - **Airflow** : ~2 min (initialisation de la base PostgreSQL)
+
+Airflow dépend de `movie_trainer_api` et `knn_api` (démarrage après eux).
 
 ### 5. Accéder à l'application
 
 - **Interface utilisateur** : http://localhost:8501  
-- **Identifiants de démo** : `admin` / `RecoFilm!2025`
+- **Identifiants de démo** : `admin` / `RecoFilm!2025`  
+- **Grafana** : `admin` / `admin` (mot de passe par défaut, modifiable via `GF_SECURITY_ADMIN_PASSWORD`)
 
 ---
 
@@ -136,11 +158,11 @@ docker compose up -d
 
 Le DAG `movie_training_pipeline` s'exécute **quotidiennement** (`@daily`) :
 
-1. **insert_data** : insère les nouvelles données (ratings, tags, genome_scores) via l'API Trainer
+1. **insert_data** : insère les nouvelles données (ratings, tags, genome_scores) via l'API Trainer (`movie_trainer_api:8000`)
 2. **trigger_training** : entraîne le modèle SVD via l'API Trainer
 3. **trigger_training_knn** : entraîne le modèle KNN via l'API KNN (authentification JWT)
 
-Les tâches SVD et KNN s'exécutent en **parallèle** après l'insertion des données.
+Les tâches SVD et KNN s'exécutent en **parallèle** après l'insertion des données. Les URLs internes utilisent les noms de services Docker (`movie_trainer_api:8000`, `knn_api:8000`).
 
 ### APIs principales
 
@@ -154,6 +176,7 @@ Les tâches SVD et KNN s'exécutent en **parallèle** après l'insertion des don
 | KNN | `/token` | POST | Authentification (username/password → JWT) |
 | KNN | `/predict` | POST | Recommandations KNN (Bearer token requis) |
 | KNN | `/training` | POST | Entraîne le modèle KNN (Bearer token requis) |
+| KNN | `/metrics` | GET | Métriques Prometheus (scrape par Prometheus) |
 
 ---
 
@@ -162,10 +185,10 @@ Les tâches SVD et KNN s'exécutent en **parallèle** après l'insertion des don
 Créer un fichier `.env` à la racine du projet :
 
 ```env
-# MLflow
+# MLflow (conteneur écoute sur 5000 en interne)
 MLFLOW_TRACKING_URI=http://mlflow:5000
 
-# PostgreSQL (Supabase)
+# PostgreSQL (Supabase) — données métier
 DATABASE_URL=postgresql://user:password@host:5432/postgres
 DB_HOST=votre-host.supabase.com
 DB_NAME=postgres
@@ -184,28 +207,34 @@ Les services `trainer`, `predicter`, `knn_api` et `mlflow` utilisent le `.env` r
 
 ---
 
-## Monitoring (Grafana & Evidently)
+## Monitoring (Grafana, Prometheus & Evidently)
 
-Le projet intègre une stack de monitoring pour surveiller les performances des APIs et détecter la dérive des données.
+Le projet intègre une stack de monitoring complète : Prometheus et Grafana sont définis dans le `docker-compose`.
 
-### Grafana + Prometheus
+### Prometheus
 
-- **Prometheus** : collecte les métriques exposées par l'API KNN via `prometheus-fastapi-instrumentator` (endpoint `/metrics`).
-- **Grafana** : dashboard avec 4 panels principaux :
-  1. **Temps de réponse** — durée des requêtes HTTP par endpoint
-  2. **Erreurs HTTP** — nombre d'erreurs 4xx/5xx par endpoint
-  3. **Requêtes par seconde** — taux de requêtes par endpoint et statut
-  4. **Requêtes actives** — nombre de requêtes en cours de traitement
+- **Image** : `prom/prometheus:latest`
+- **Port** : 9090
+- **Configuration** : `prometheus.yml` à la racine — scrape de l'API KNN (`knn-api:8000`) toutes les 15 s
+- **Stockage** : volume `prometheus_data`
 
-L'API KNN expose automatiquement les métriques Prometheus (latence, erreurs, throughput).
+### Grafana
+
+- **Image** : `grafana/grafana:latest`
+- **Port** : 3000
+- **Identifiants** : `admin` / `admin` (variable `GF_SECURITY_ADMIN_PASSWORD`)
+- **Provisioning** : datasource Prometheus préconfigurée dans `grafana/provisioning/datasources/` (URL interne `http://prometheus:9090`)
+- **Dashboards** : 4 panels typiques — temps de réponse, erreurs HTTP, requêtes/s, requêtes actives (configuration dans `grafana/provisioning` si présente)
 
 ### Evidently (Data Drift)
 
-- **Détection de drift** : scripts dans `knn_api/monitoring/` :
-  - `drift_detection.py` — compare les données de référence (CSV) avec les données courantes (Supabase) via `DataDriftPreset` et `DataQualityPreset`
-  - `auto_retrain.py` — déclenche un retrain automatique en cas de drift détecté
-- **Rapports** : génération de rapports HTML pour visualiser la dérive des données (Target drift, Data drift).
-- **Stratégie de maintenance** : en cas de drift au-delà du seuil, un retrain peut être déclenché (règle ou cron).
+- **Hors Docker** : scripts Python dans `knn_api/monitoring/`
+  - `drift_detection.py` : compare données de référence (CSV) et données courantes (Supabase) avec `DataDriftPreset` et `DataQualityPreset`
+  - `auto_retrain.py` : déclenche un retrain en cas de drift
+- **Rapports** : génération de rapports HTML (Target drift, Data drift)
+- **Stratégie** : retrain planifié ou déclenché selon seuils de drift
+
+L'API KNN expose les métriques via `prometheus-fastapi-instrumentator` (endpoint `/metrics`), scrapées par Prometheus puis visualisées dans Grafana.
 
 ---
 
@@ -218,18 +247,22 @@ sep25_cmlops_reco_films2/
 │   │   └── movie_training_pipeline.py
 │   ├── airflow.cfg
 │   └── .env
+├── grafana/                 # Provisioning Grafana
+│   └── provisioning/
+│       └── datasources/     # Datasource Prometheus
 ├── mlflow/                  # Service MLflow
 ├── trainer/                 # API d'entraînement SVD + insert-data
-├── predicter/               # API de prédiction SVD
-├── knn_api/                 # API KNN (training + predict + auth)
+├── predicter/                # API de prédiction SVD
+├── knn_api/                 # API KNN (training + predict + auth + /metrics)
 │   └── monitoring/          # Evidently (drift_detection, auto_retrain)
-├── streamlit-ui/             # Interface Streamlit
+├── streamlit-ui/            # Interface Streamlit
 │   ├── app.py
 │   ├── demo.py
 │   └── assets/
 ├── shared/                  # Code partagé (ex: svd_wrapper)
 ├── models/                  # Modèles entraînés (volumes Docker)
 ├── mlflow_data/             # Données MLflow (SQLite)
+├── prometheus.yml           # Config Prometheus (scrape knn-api)
 ├── docker-compose.yml
 └── .env
 ```
