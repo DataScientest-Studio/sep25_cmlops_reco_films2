@@ -177,7 +177,9 @@ PAGES = [
     ("p1", "1 — Fondations: Data, DB, API"),
     ("p2", "2 — Microservice, Versionning et orchestration"),
     ("p4", "3 — Monitoring & Maintenance"),
-    ("p5", "4 — Frontend"),
+    ("p5", "4 — Démonstration"),
+    ("p6", "5 — Conclusion"),
+    
 ]
 PAGE_LABEL = {k: v for k, v in PAGES}
 
@@ -345,8 +347,18 @@ def render_intro():
 
     st.write("")
 
-    # --- (2) Objectifs + Utilisation + Architecture + Roadmap dans des tabs ---
-    tabs = st.tabs(["🎯 Objectifs", "🧭 Utilisation", "🏗️ Architecture", "🗺️ Roadmap"])
+    # --- (2) Objectifs + Architecture + Roadmap dans des tabs ---
+    tabs = st.tabs(["🎯 Objectifs",  "🏗️ Architecture", "🗺️ Roadmap"])
+
+    # helper local pour afficher image si dispo sinon placeholder
+    def show_image_or_placeholder(path: str, caption: str, height: int = 360):
+        if path and os.path.exists(path):
+            st.image(path, use_container_width=True, caption=caption)
+        else:
+            capture_placeholder(
+                f"📌 Image à ajouter : <b>{caption}</b><br><span class='muted'>Chemin : {path}</span>",
+                height=height,
+            )
 
     with tabs[0]:
         objectifs_html = """
@@ -394,25 +406,15 @@ def render_intro():
         st.markdown(objectifs_html, unsafe_allow_html=True)
 
     with tabs[1]:
-        # mets ton image ici (ex: assets/intro_utilisation.png)
         show_image_or_placeholder(
-            filename="intro_utilisation.png",
-            caption="Utilisation de l'application (démo RecoFilm)",
-            height=440,
-        )
-
-    with tabs[2]:
-        # mets ton image ici (ex: assets/intro_architecture.png)
-        show_image_or_placeholder(
-            filename="intro_architecture.png",
+            path="assets/intro_architecture.png",
             caption="Architecture (services & flux)",
             height=440,
         )
-
-    with tabs[3]:
-        # mets ton image ici (ex: assets/intro_roadmap.png)
+        
+    with tabs[2]:
         show_image_or_placeholder(
-            filename="intro_roadmap.png",
+            path="assets/intro_roadmap.png",
             caption="Roadmap (5 phases)",
             height=440,
         )
@@ -689,8 +691,8 @@ def render_phase2():
         left, right = st.columns([0.6, 0.4], gap="large")
         with left:
             st.image(
-                ASSETS_DIR / "archi_docker.png",
-                caption="GitHub Actions",
+                ASSETS_DIR / "mermaid_schema.png",
+                caption="Architecture Docker (services & flux)",
                 use_container_width=False,
                 width=1000,
             )
@@ -703,86 +705,68 @@ def render_phase2():
             )
 
     with tabs[2]:
-        st.components.v1.html(
-            f"""
-          <div style="
-              border:2px solid black;       /* contour noir */
-              border-radius:8px;            /* coins arrondis */
-              width:1220px;                 /* pour inclure padding */
-          ">
-              <iframe 
-                  src="{PREDICTER_URL}" 
-                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
-                  scrolling="yes">
-              </iframe>
-          </div>
-          """,
-            height=420,
+        st.link_button("API Prédiction SVD", "http://localhost:8003/docs")
+        st.image(
+            ASSETS_DIR / "8003.png",
+            caption="API Prédiction SVD",
+            use_container_width=False,
+            width=1000,
         )
-        st.components.v1.html(
-            f"""
-          <div style="
-              border:2px solid black;       /* contour noir */
-              border-radius:8px;            /* coins arrondis */
-              width:1220px;                 /* pour inclure padding */
-          ">
-              <iframe 
-                  src="{TRAINER_API_URL}" 
-                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
-                  scrolling="yes">
-              </iframe>
-          </div>
-          """,
-            height=420,
+        st.link_button("API Entrainement SVD", "http://localhost:8001/docs")
+        st.image(
+            ASSETS_DIR / "8001.png",
+            caption="API Entrainement SVD",
+            use_container_width=False,
+            width=1000,
         )
-        st.components.v1.html(
-            f"""
-          <div style="
-              border:2px solid black;       /* contour noir */
-              border-radius:8px;            /* coins arrondis */
-              width:1220px;                 /* pour inclure padding */
-          ">
-              <iframe 
-                  src="{FASTAPI_KNN_URL}" 
-                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
-                  scrolling="yes">
-              </iframe>
-          </div>
-          """,
-            height=420,
+        st.link_button("API Entrainement SVD", "http://localhost:8002/docs")
+        st.image(
+            ASSETS_DIR / "8002.png",
+            caption="API KNN",
+            use_container_width=False,
+            width=1000,
         )
     with tabs[3]:
-        st.components.v1.html(
-            f"""
-          <div style="width:100%; height:800px; border:2px solid black; border-radius:6px;">
-              <iframe 
-                  src="{AIRFLOW_URL}" 
-                  scrolling="yes"
-                  style="width:100%; height:100%;">
-              </iframe>
-          </div>
-          """,
-            height=3000,
-        )
+        st.link_button("Airflow", "http://localhost:8085")
+        st.image(
+                ASSETS_DIR / "airflow_interface.png",
+                caption="Airflow Interface",
+                use_container_width=False,
+                width=1000,
+            )
+        st.image(
+                ASSETS_DIR / "airflow_dag_exec.png",
+                caption="Airflow Dag execution",
+                use_container_width=False,
+                width=1000,
+            )
 
     with tabs[4]:
-        st.components.v1.html(
-            f"""
-          <div style="
-              border:2px solid black;       /* contour noir */
-              border-radius:8px;            /* coins arrondis */
-              padding:4px;                  /* petit padding autour */
-              width:1220px;                 /* pour inclure padding */
-          ">
-              <iframe 
-                  src="{MLFLOW_URL}" 
-                  style="width:1200px; height:400px; border:none; border-radius:6px;" 
-                  scrolling="yes">
-              </iframe>
-          </div>
-          """,
-            height=3000,
-        )
+        st.link_button("MLFlow", "http://localhost:5001")
+        st.image(
+                ASSETS_DIR / "mlflow_1.png",
+                caption="MLFlow Interface",
+                use_container_width=False,
+                width=1000,
+            )
+        st.image(
+                ASSETS_DIR / "mlflow_2.png",
+                caption="MLFlow Models Registry",
+                use_container_width=False,
+                width=1000,
+            )
+        st.image(
+                ASSETS_DIR / "mlflow_5.png",
+                caption="MLFlow SVD Runs (metrics + params)",
+                use_container_width=False,
+                width=1000,
+            )
+        st.image(
+                ASSETS_DIR / "mlflow_6.png",
+                caption="MLFlow KNN Runs (metrics + params)",
+                use_container_width=False,
+                width=1000,
+            )
     with tabs[5]:
 
         st.image(
@@ -1081,7 +1065,7 @@ def render_phase5():
         ]
     )
 
-    tabs = st.tabs(["🎯 Objectifs", "🧪 Démo", "🧩 Widgets", "📌 Captures", "🧯 Défis"])
+    tabs = st.tabs(["🎯 Objectifs", "🧪 Démo"])
 
     with tabs[0]:
         st.markdown(
@@ -1117,48 +1101,124 @@ def render_phase5():
 """,
                 unsafe_allow_html=True,
             )
+# ============================================================
+# 6) Pages - Phase 6 Conclusion & Next Steps  -- à ajouter après le demo
+# ============================================================
+def render_phase6():
+    st.markdown("## Conclusion & Next Steps")
+    st.markdown(
+        "<div class='subtitle'>Bilan du projet et perspectives d'évolution</div>",
+        unsafe_allow_html=True,
+    )
+    st.write("")
 
-    with tabs[2]:
+    # ---- Conclusion ----
+    st.markdown(
+        """
+<div class="card">
+  <h3>✅ Conclusion</h3>
+  <div style="margin-top:12px; line-height:1.75;">
+    Au cours de ce projet, nous avons conçu et implémenté un système de recommandation
+    de films <b>bout-en-bout</b> suivant les principes MLOps :<br><br>
+    • Données ingérées dans <b>PostgreSQL (Supabase)</b><br>
+    • Deux modèles entraînés et comparés : <b>KNN + SVD</b><br>
+    • <b>3 API FastAPI</b> conteneurisées dans Docker<br>
+    • Versioning et élection du champion via <b>MLflow</b><br>
+    • Orchestration quotidienne avec <b>Airflow</b><br>
+    • Monitoring temps réel (<b>Prometheus + Grafana</b>) et détection de drift (<b>Evidently</b>)<br>
+    • Pipeline <b>CI/CD</b> avec GitHub Actions → Docker Hub<br>
+    • Interface de démonstration <b>Streamlit</b><br><br>
+    Merci à <b>Nicolas</b> pour son accompagnement et ses retours tout au long du projet. 🙏
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.write("")
+    st.write("")
+
+    # ---- Next Steps ----
+    st.markdown("### 🚀 Next Steps")
+    st.write("")
+
+    c1, c2, c3 = st.columns(3, gap="medium")
+
+    with c1:
         st.markdown(
             """
-<div class="card">
-  <h3>Widgets recommandés</h3>
-  <div style="margin-top:10px; line-height:1.9;">
-    • <code>st.selectbox</code> pour user_id<br>
-    • <code>st.button</code> pour déclencher /predict<br>
-    • <code>st.dataframe</code> pour afficher le Top-N<br>
-    • <code>st.metric</code> pour infos modèle (option)<br>
+<div class="card" style="height:100%;">
+  <h3>☁️ Déploiement Cloud</h3>
+  <div class="muted" style="margin-top:8px; line-height:1.65;">
+    Migrer les services Docker vers une plateforme cloud
+    pour la scalabilité et la haute disponibilité.
+  </div>
+  <div style="margin-top:12px;">
+    <span class="pill">AWS ECS</span>
+    <span class="pill">GCP Cloud Run</span>
+    <span class="pill">Kubernetes</span>
   </div>
 </div>
 """,
             unsafe_allow_html=True,
         )
 
-    with tabs[3]:
-        left, right = st.columns([0.5, 0.5], gap="large")
-        with left:
-            capture_placeholder("📌 Capture : page Intro (roadmap)", height=240)
-            st.write("")
-            capture_placeholder("📌 Capture : Phase 1 (DB / API)", height=240)
-        with right:
-            capture_placeholder("📌 Capture : Phase 2 (MLflow)", height=240)
-            st.write("")
-            capture_placeholder("📌 Capture : Phase 4 (Grafana/Evidently)", height=240)
-
-    with tabs[4]:
+    with c2:
         st.markdown(
             """
-<div class="card">
-  <h3>Défis & Solutions</h3>
-  <div style="margin-top:10px; line-height:1.8;">
-    <b>Clarté</b> → 3 messages clés par Phases<br>
-    <b>Preuves</b> → captures intégrées<br>
-    <b>Temps</b> → démo simple, sans dépendances lourdes
+<div class="card" style="height:100%;">
+  <h3>🔗 Orchestration unifiée</h3>
+  <div class="muted" style="margin-top:8px; line-height:1.65;">
+    Intégrer la détection de drift dans le DAG Airflow
+    pour un pipeline unifié : insertion → train → drift → retrain.
+  </div>
+  <div style="margin-top:12px;">
+    <span class="pill">Airflow DAG</span>
+    <span class="pill">Alerting</span>
   </div>
 </div>
 """,
             unsafe_allow_html=True,
         )
+
+    with c3:
+        st.markdown(
+            """
+<div class="card" style="height:100%;">
+  <h3>🔔 Alertes & Notifications</h3>
+  <div class="muted" style="margin-top:8px; line-height:1.65;">
+    Mettre en place des alertes automatiques
+    lors de drift détecté ou d'anomalies API.
+  </div>
+  <div style="margin-top:12px;">
+    <span class="pill">Slack</span>
+    <span class="pill">E-mail</span>
+    <span class="pill">Grafana Alerts</span>
+  </div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+    st.write("")
+
+    # ---- Merci ----
+    st.markdown(
+        """
+<div style="text-align:center; padding:30px 0 10px 0;">
+  <span style="font-size:2.2rem;">🙏</span>
+  <h2 style="margin-top:8px;">Merci pour votre attention</h2>
+  <p class="muted" style="font-size:1.05rem; margin-top:4px;">Des questions ?</p>
+  <div style="margin-top:14px;">
+    <span class="pill">Jimmy</span>
+    <span class="pill">Yacine</span>
+    <span class="pill">Jingzi</span>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
 
 
 # ============================================================
@@ -1174,3 +1234,5 @@ elif page_key == "p4":
     afficher_slide3_4()
 elif page_key == "p5":
     render_phase5()
+elif page_key == "p6":
+    render_phase6() 
