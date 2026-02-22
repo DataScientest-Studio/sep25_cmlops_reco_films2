@@ -48,13 +48,13 @@ def main():
     scheduler = BlockingScheduler()
 
     # Option 1: Tous les jours à 2h du matin
-    #scheduler.add_job(
+    # scheduler.add_job(
     #    run_auto_retrain,
     #    CronTrigger(hour=2, minute=0),
     #    id="daily_retrain_check",
     #    name="Vérification quotidienne du drift et réentraînement",
     #    replace_existing=True,
-    #)
+    # )
 
     # Option 2: Toutes les heures (démo)
     # scheduler.add_job(
@@ -68,11 +68,11 @@ def main():
     # Option 3: Toutes les 5 minutes (test)
     scheduler.add_job(
         run_auto_retrain,
-        'interval',
+        "interval",
         minutes=5,
-        id='test_retrain_check',
-        name='Test - Vérification toutes les 5 minutes',
-        replace_existing=True
+        id="test_retrain_check",
+        name="Test - Vérification toutes les 5 minutes",
+        replace_existing=True,
     )
 
     print("\n PLANIFICATION CONFIGURÉE:")

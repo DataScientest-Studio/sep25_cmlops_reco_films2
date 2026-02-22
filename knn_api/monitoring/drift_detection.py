@@ -8,10 +8,9 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from config import get_connection
 from evidently.metric_preset import DataDriftPreset, DataQualityPreset
 from evidently.report import Report
-from config import get_connection
-
 
 
 def load_reference_data():
@@ -25,8 +24,8 @@ def load_reference_data():
     print("\n1. Chargement des données de référence (CSV)...")
 
     project_root = Path(__file__).resolve().parent
-    movie_matrix_path = project_root / ".." / "api" /  "movie_matrix.csv"
-    user_matrix_path = project_root / ".." / "api" /  "user_matrix.csv"
+    movie_matrix_path = project_root / ".." / "api" / "movie_matrix.csv"
+    user_matrix_path = project_root / ".." / "api" / "user_matrix.csv"
 
     if not movie_matrix_path.exists():
         raise FileNotFoundError(f"Movie matrix non trouvée: {movie_matrix_path}")
@@ -147,25 +146,44 @@ def reconstruct_movie_matrix(ratings, movies):
     return movie_matrix
 
 
-
 def reconstruct_user_matrix(ratings, movies):
     """
     Reconstruit la user_matrix à partir des ratings actuels
     Inclut les proportions de genres comme la matrice de référence
     """
     genres_list = [
-        "Action", "Adventure", "Animation", "Children", "Comedy", "Crime",
-        "Documentary", "Drama", "Fantasy", "Film-Noir", "Horror", "IMAX",
-        "Musical", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western",
+        "Action",
+        "Adventure",
+        "Animation",
+        "Children",
+        "Comedy",
+        "Crime",
+        "Documentary",
+        "Drama",
+        "Fantasy",
+        "Film-Noir",
+        "Horror",
+        "IMAX",
+        "Musical",
+        "Mystery",
+        "Romance",
+        "Sci-Fi",
+        "Thriller",
+        "War",
+        "Western",
     ]
 
     # Ajouter les colonnes de genres aux ratings
     movies_copy = movies.copy()
     for genre in genres_list:
-        movies_copy[genre] = movies_copy["genres"].str.contains(genre, na=False).astype(int)
+        movies_copy[genre] = (
+            movies_copy["genres"].str.contains(genre, na=False).astype(int)
+        )
 
     # Joindre ratings avec les genres des films
-    ratings_with_genres = ratings.merge(movies_copy[["movieid"] + genres_list], on="movieid", how="left")
+    ratings_with_genres = ratings.merge(
+        movies_copy[["movieid"] + genres_list], on="movieid", how="left"
+    )
 
     # Calculer les stats de base par utilisateur
     user_stats = (
@@ -174,7 +192,9 @@ def reconstruct_user_matrix(ratings, movies):
     user_stats.columns = ["userid", "avg_rating_given", "num_ratings_given"]
 
     # Calculer les proportions de genres par utilisateur
-    genre_props = ratings_with_genres.groupby("userid")[genres_list].mean().reset_index()
+    genre_props = (
+        ratings_with_genres.groupby("userid")[genres_list].mean().reset_index()
+    )
 
     # Merger tout ensemble
     user_matrix = user_stats.merge(genre_props, on="userid", how="left")
@@ -186,6 +206,7 @@ def reconstruct_user_matrix(ratings, movies):
     print(f"   User matrix reconstruite: {len(user_matrix)} utilisateurs")
 
     return user_matrix
+
 
 def generate_drift_report(reference_data, current_data, output_path, report_name):
     """

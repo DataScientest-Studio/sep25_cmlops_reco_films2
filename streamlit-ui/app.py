@@ -179,7 +179,6 @@ PAGES = [
     ("p4", "3 — Monitoring & Maintenance"),
     ("p5", "4 — Démonstration"),
     ("p6", "5 — Conclusion"),
-    
 ]
 PAGE_LABEL = {k: v for k, v in PAGES}
 
@@ -216,7 +215,7 @@ def show_image_or_placeholder(filename: str, caption: str, height: int = 360):
     # Afficher l'image si elle existe, sinon placeholder.
     img_path = ASSETS_DIR / filename
     if img_path.exists():
-        st.image(asset(filename), width='stretch', caption=caption)
+        st.image(asset(filename), width="stretch", caption=caption)
     else:
         capture_placeholder(
             f"📌 Image à ajouter : <b>{caption}</b><br><span class='muted'>Fichier : {filename}</span>",
@@ -348,12 +347,12 @@ def render_intro():
     st.write("")
 
     # --- (2) Objectifs + Architecture + Roadmap dans des tabs ---
-    tabs = st.tabs(["🎯 Objectifs",  "🏗️ Architecture", "🗺️ Roadmap"])
+    tabs = st.tabs(["🎯 Objectifs", "🏗️ Architecture", "🗺️ Roadmap"])
 
     # helper local pour afficher image si dispo sinon placeholder
     def show_image_or_placeholder(path: str, caption: str, height: int = 360):
         if path and os.path.exists(path):
-            st.image(path, width='stretch', caption=caption)
+            st.image(path, width="stretch", caption=caption)
         else:
             capture_placeholder(
                 f"📌 Image à ajouter : <b>{caption}</b><br><span class='muted'>Chemin : {path}</span>",
@@ -411,7 +410,7 @@ def render_intro():
             caption="Architecture (services & flux)",
             height=440,
         )
-        
+
     with tabs[2]:
         show_image_or_placeholder(
             path="assets/intro_roadmap.png",
@@ -425,23 +424,37 @@ def render_intro():
 # ============================================================
 def render_phase1():
     st.markdown("## Phase 1 — Fondations")
-    st.markdown("<div class='subtitle'>Deadline : 3 Novembre 2025</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='subtitle'>Deadline : 3 Novembre 2025</div>", unsafe_allow_html=True
+    )
     st.write("")
 
     # Top metrics
-    metric_cards([
-        {"icon":"🎬", "label":"Films", "value":"14026"},
-        {"icon":"👥", "label":"Utilisateurs", "value":"7120"},
-        {"icon":"⭐", "label":"Ratings", "value":"10M"},
-        {"icon":"🗄️", "label":"DB", "value":"PostgreSQL"},
-        {"icon":"🤖", "label":"Modèle", "value":"KNN/SVD"},
-        {"icon":"📜", "label":"Scripts", "value":"training + predict"},
-    ])
+    metric_cards(
+        [
+            {"icon": "🎬", "label": "Films", "value": "14026"},
+            {"icon": "👥", "label": "Utilisateurs", "value": "7120"},
+            {"icon": "⭐", "label": "Ratings", "value": "10M"},
+            {"icon": "🗄️", "label": "DB", "value": "PostgreSQL"},
+            {"icon": "🤖", "label": "Modèle", "value": "KNN/SVD"},
+            {"icon": "📜", "label": "Scripts", "value": "training + predict"},
+        ]
+    )
 
     status_ok("Phase 1 livrée : data + DB + ML + API")
     st.write("")
 
-    tabs = st.tabs(["🎯 Objectifs & Livrables", "🧹 Données", "🗄️ DB", "🤖 Modèle", "🧩 API", "📜 Scripts", "🧯 Défis"])
+    tabs = st.tabs(
+        [
+            "🎯 Objectifs & Livrables",
+            "🧹 Données",
+            "🗄️ DB",
+            "🤖 Modèle",
+            "🧩 API",
+            "📜 Scripts",
+            "🧯 Défis",
+        ]
+    )
 
     with tabs[0]:
         left, right = st.columns([0.55, 0.45], gap="large")
@@ -497,7 +510,9 @@ def render_phase1():
             unsafe_allow_html=True,
         )
         st.write("")
-        st.image(asset("1_DataFrame.png"), caption="Aperçu des données", width='stretch')
+        st.image(
+            asset("1_DataFrame.png"), caption="Aperçu des données", width="stretch"
+        )
 
     with tabs[2]:
         st.markdown("##### Base de Données PostgreSQL (Supabase)")
@@ -520,9 +535,11 @@ def render_phase1():
             )
 
         with right:
-             st.image(asset("1_Database.png"), caption="Aperçu des données (Exemple)", width='stretch')
-
-      
+            st.image(
+                asset("1_Database.png"),
+                caption="Aperçu des données (Exemple)",
+                width="stretch",
+            )
 
     with tabs[3]:
         left, right = st.columns([0.6, 0.4], gap="large")
@@ -581,7 +598,11 @@ def render_phase1():
                 unsafe_allow_html=True,
             )
             st.write("")
-            st.image(asset("1_FastAPI.png"), caption="FastAPI /docs (Swagger) + test predict", width='stretch')
+            st.image(
+                asset("1_FastAPI.png"),
+                caption="FastAPI /docs (Swagger) + test predict",
+                width="stretch",
+            )
 
     with tabs[5]:
         left, right = st.columns([0.55, 0.45], gap="large")
@@ -620,7 +641,6 @@ def render_phase1():
             )
         with right:
             pass
-
 
 
 # ============================================================
@@ -729,44 +749,44 @@ def render_phase2():
     with tabs[3]:
         st.link_button("Airflow", "http://localhost:8085")
         st.image(
-                ASSETS_DIR / "airflow_interface.png",
-                caption="Airflow Interface",
-                use_container_width=False,
-                width=1000,
-            )
+            ASSETS_DIR / "airflow_interface.png",
+            caption="Airflow Interface",
+            use_container_width=False,
+            width=1000,
+        )
         st.image(
-                ASSETS_DIR / "airflow_dag_exec.png",
-                caption="Airflow Dag execution",
-                use_container_width=False,
-                width=1000,
-            )
+            ASSETS_DIR / "airflow_dag_exec.png",
+            caption="Airflow Dag execution",
+            use_container_width=False,
+            width=1000,
+        )
 
     with tabs[4]:
         st.link_button("MLFlow", "http://localhost:5001")
         st.image(
-                ASSETS_DIR / "mlflow_1.png",
-                caption="MLFlow Interface",
-                use_container_width=False,
-                width=1000,
-            )
+            ASSETS_DIR / "mlflow_1.png",
+            caption="MLFlow Interface",
+            use_container_width=False,
+            width=1000,
+        )
         st.image(
-                ASSETS_DIR / "mlflow_2.png",
-                caption="MLFlow Models Registry",
-                use_container_width=False,
-                width=1000,
-            )
+            ASSETS_DIR / "mlflow_2.png",
+            caption="MLFlow Models Registry",
+            use_container_width=False,
+            width=1000,
+        )
         st.image(
-                ASSETS_DIR / "mlflow_5.png",
-                caption="MLFlow SVD Runs (metrics + params)",
-                use_container_width=False,
-                width=1000,
-            )
+            ASSETS_DIR / "mlflow_5.png",
+            caption="MLFlow SVD Runs (metrics + params)",
+            use_container_width=False,
+            width=1000,
+        )
         st.image(
-                ASSETS_DIR / "mlflow_6.png",
-                caption="MLFlow KNN Runs (metrics + params)",
-                use_container_width=False,
-                width=1000,
-            )
+            ASSETS_DIR / "mlflow_6.png",
+            caption="MLFlow KNN Runs (metrics + params)",
+            use_container_width=False,
+            width=1000,
+        )
     with tabs[5]:
 
         st.image(
@@ -1083,7 +1103,9 @@ def render_phase5():
         )
 
     with tabs[1]:
-            demo()
+        demo()
+
+
 # ============================================================
 # 6) Pages - Phase 6 Conclusion & Next Steps  -- à ajouter après le demo
 # ============================================================
@@ -1218,4 +1240,4 @@ elif page_key == "p4":
 elif page_key == "p5":
     render_phase5()
 elif page_key == "p6":
-    render_phase6() 
+    render_phase6()
