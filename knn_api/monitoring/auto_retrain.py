@@ -9,9 +9,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from drift_detection import (load_current_data_from_supabase,
-                             load_reference_data, reconstruct_movie_matrix,
-                             reconstruct_user_matrix)
+from drift_detection import (
+    load_current_data_from_supabase,
+    load_reference_data,
+    reconstruct_movie_matrix,
+    reconstruct_user_matrix,
+)
 from evidently.metric_preset import DataDriftPreset
 from evidently.report import Report
 
