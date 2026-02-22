@@ -10,4 +10,4 @@ RUN apt-get update && apt-get install -y \
     && pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-CMD ["mlflow", "ui", "--backend-store-uri=sqlite:///mlflow.db", "--default-artifact-root=/app/artifacts","--host=0.0.0.0","--port=5000"]
+CMD ["mlflow", "ui", "--backend-store-uri=sqlite:///mlflow.db", "--default-artifact-root=/app/artifacts","--host=0.0.0.0","--port=5000","--allowed-hosts=*"]
