@@ -726,7 +726,7 @@ def render_phase2():
 
     with tabs[2]:
         st.link_button("API KNN", "http://localhost:8002/docs")
-        st.text('API sécurisée par user/mot de passe (Basic Auth)')
+        st.text("API sécurisée par user/mot de passe (Basic Auth)")
         st.image(
             ASSETS_DIR / "8002.png",
             caption="API KNN",
@@ -734,7 +734,7 @@ def render_phase2():
             width=1000,
         )
         st.link_button("API Prédiction SVD", "http://localhost:8003/docs")
-        st.text('API sécurisée avec token d’authentification (Bearer <token>)')
+        st.text("API sécurisée avec token d’authentification (Bearer <token>)")
         st.image(
             ASSETS_DIR / "8003.png",
             caption="API Prédiction SVD",
@@ -742,7 +742,7 @@ def render_phase2():
             width=1000,
         )
         st.link_button("API Entrainement SVD", "http://localhost:8001/docs")
-        st.text('API sécurisée avec token d’authentification (Bearer <token>)')
+        st.text("API sécurisée avec token d’authentification (Bearer <token>)")
         st.image(
             ASSETS_DIR / "8001.png",
             caption="API Entrainement SVD",

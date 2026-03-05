@@ -222,13 +222,15 @@ def demo():
                         st.rerun()
                     else:
                         st.error("Nom d'utilisateur ou mot de passe incorrect.")
-        st.markdown("---") 
-        st.text('A la première connexion, nous allons télécharger les posters en local depuis Kaggle (20k images, ~500Mo), cela peut prendre quelques secondes. ' \
-        'Nous générons un id aléatoire pour un utilisateur qui sera authentifié via l’API KNN (http://localhost:8002/docs) qui est sécurisée par user/mot de passe (Basic Auth). ' \
-        'Une fois connecté, l\’API KNN est appelée pour récupérer une liste de recommandations personnalisées du user.\n\n'\
-        'Avec cette liste de recommandation, on appelle l\'API de prédiction SVD de façon sécurisées par token d’authentification (Bearer token), afin d\'avoir les notes prédites pour chaque film recommandé. ' \
-        'L\'ensemble des films ayants une note prédite supérieur à 4 sont affichés par ordre de note prédite décroissante, avec leur poster, genres, note moyenne générale et note prédite.\n\n' \
-        'Pour les user avec peu de recommandations (grand consommateurs), on affiche tous les films recommandés (même ceux avec note prédite < 4) pour éviter d\'avoir une page vide.')
+        st.markdown("---")
+        st.text(
+            "A la première connexion, nous allons télécharger les posters en local depuis Kaggle (20k images, ~500Mo), cela peut prendre quelques secondes. "
+            "Nous générons un id aléatoire pour un utilisateur qui sera authentifié via l’API KNN (http://localhost:8002/docs) qui est sécurisée par user/mot de passe (Basic Auth). "
+            "Une fois connecté, l\’API KNN est appelée pour récupérer une liste de recommandations personnalisées du user.\n\n"
+            "Avec cette liste de recommandation, on appelle l'API de prédiction SVD de façon sécurisées par token d’authentification (Bearer token), afin d'avoir les notes prédites pour chaque film recommandé. "
+            "L'ensemble des films ayants une note prédite supérieur à 4 sont affichés par ordre de note prédite décroissante, avec leur poster, genres, note moyenne générale et note prédite.\n\n"
+            "Pour les user avec peu de recommandations (grand consommateurs), on affiche tous les films recommandés (même ceux avec note prédite < 4) pour éviter d'avoir une page vide."
+        )
         st.image(
             ASSETS_DIR / "demo_recofilm.png",
             caption="Interface de recommandation",
